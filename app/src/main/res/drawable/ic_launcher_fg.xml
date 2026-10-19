@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 머리 위 꼬불 머리카락 -->
+    <path android:strokeColor="#3A2E2A" android:strokeWidth="2.6" android:strokeLineCap="round"
+        android:pathData="M54,31 C51,26 57,24 55,20" />
+    <!-- 통통한 몸 -->
+    <path android:fillColor="#FFD45C" android:pathData="M54,30 C72,30 82,43 82,59 C82,75 70,84 54,84 C38,84 26,75 26,59 C26,43 36,30 54,30 Z" />
+    <!-- 배 -->
+    <path android:fillColor="#FFE9A8" android:pathData="M54,62 C64,62 70,68 70,74 C70,80 63,83 54,83 C45,83 38,80 38,74 C38,68 44,62 54,62 Z" />
+    <!-- 볼 -->
+    <path android:fillColor="#FF9AA8" android:pathData="M37,62a4.5,3.5 0,1 1,9 0a4.5,3.5 0,1 1,-9 0z" />
+    <path android:fillColor="#FF9AA8" android:pathData="M62,62a4.5,3.5 0,1 1,9 0a4.5,3.5 0,1 1,-9 0z" />
+    <!-- 눈 -->
+    <path android:fillColor="#2B2220" android:pathData="M42,53a3.6,4 0,1 1,7.2 0a3.6,4 0,1 1,-7.2 0z" />
+    <path android:fillColor="#2B2220" android:pathData="M58.8,53a3.6,4 0,1 1,7.2 0a3.6,4 0,1 1,-7.2 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M44,51.5a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M60.8,51.5a1.2,1.2 0,1 1,2.4 0a1.2,1.2 0,1 1,-2.4 0z" />
+    <!-- 웃는 입 -->
+    <path android:strokeColor="#2B2220" android:strokeWidth="2.2" android:strokeLineCap="round"
+        android:pathData="M50,60 Q54,64 58,60" />
+</vector>

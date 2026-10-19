@@ -100,7 +100,7 @@ class MainActivity : AppCompatActivity() {
         }.also { col.addView(it) }
 
         TextView(this).apply {
-            text = "드라이브 알리미"; textSize = 24f; gravity = Gravity.START
+            text = "통통이"; textSize = 24f; gravity = Gravity.START
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }.also { col.addView(it) }
         statusView = TextView(this).apply { textSize = 14f; setPadding(0, pad / 2, 0, 0) }.also { col.addView(it) }
@@ -151,7 +151,7 @@ class MainActivity : AppCompatActivity() {
         switch("티맵·네이버지도 길안내 중이면 이 앱 음성 끄기", { prefs.muteWithOtherNav }) { prefs.muteWithOtherNav = it }
         button("↳ 이를 위해 '알림 접근' 허용하기") {
             try { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) } catch (_: Exception) {}
-            toast("목록에서 '드라이브 알리미'를 켜 주세요")
+            toast("목록에서 '통통이'를 켜 주세요")
         }
         choice("과속 경고 기준", listOf("제한속도 넘으면 바로", "제한속도 +5km", "제한속도 +10km", "제한속도 +10%"),
             listOf(Prefs.MARGIN_0, Prefs.MARGIN_5, Prefs.MARGIN_10, Prefs.MARGIN_10P),
