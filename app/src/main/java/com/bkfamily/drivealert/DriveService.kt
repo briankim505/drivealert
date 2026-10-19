@@ -53,7 +53,14 @@ class DriveService : Service(), LocationListener {
             .build()
 
         val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
-        ServiceCompat.startForeground(this, NOTIF_ID, notif, type)
+        try {
+            ServiceCompat.startForeground(this, NOTIF_ID, notif, type)
+        } catch (e: Exception) {
+            CrashLog.save(this, e)
+            running = false
+            stopSelf()
+            return
+        }
 
         val pm = getSystemService(PowerManager::class.java)
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "drivealert:drive").apply {

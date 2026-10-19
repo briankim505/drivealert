@@ -23,9 +23,16 @@ object DriveControl {
         stop(context)
     }
 
-    fun start(context: Context) {
-        if (DriveService.running) return
-        ContextCompat.startForegroundService(context, Intent(context, DriveService::class.java))
+    fun start(context: Context): Boolean {
+        if (DriveService.running) return true
+        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) return false
+        return try {
+            ContextCompat.startForegroundService(context, Intent(context, DriveService::class.java)); true
+        } catch (e: Exception) {
+            CrashLog.save(context, e); false
+        }
     }
 
     fun stop(context: Context) {

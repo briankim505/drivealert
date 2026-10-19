@@ -64,6 +64,12 @@ class MainActivity : AppCompatActivity() {
         prefs = Prefs(this)
         setContentView(buildUi())
         Updater.check(this, silent = true)
+        CrashLog.take(this)?.let { log ->
+            AlertDialog.Builder(this)
+                .setTitle("지난번 오류 기록")
+                .setMessage(log.take(1500))
+                .setPositiveButton("확인", null).show()
+        }
     }
 
     override fun onResume() {

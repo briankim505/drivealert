@@ -9,8 +9,17 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        val prev = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            CrashLog.save(this, e)
+            prev?.uncaughtException(t, e)
+        }
         // 카카오내비 SDK 등록 (지도·음성 데이터 저장 경로)
-        KNSDK.install(this, "$filesDir/knsdk")
+        try {
+            KNSDK.install(this, "$filesDir/knsdk")
+        } catch (e: Throwable) {
+            CrashLog.save(this, e)
+        }
 
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(

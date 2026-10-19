@@ -71,10 +71,33 @@ class DriveActivity : AppCompatActivity(),
             this, stopReceiver, IntentFilter(DriveControl.ACTION_STOP), ContextCompat.RECEIVER_NOT_EXPORTED
         )
 
-        // 수동으로 연 경우에도 서비스(화면 꺼짐 대비)를 같이 켠다
-        if (!DriveService.running) DriveControl.start(this)
+        status.text = "시작 중…"
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            locPerm.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.ACCESS_COARSE_LOCATION))
+        } else afterPermission()
+    }
 
-        initKakao()
+    private val locPerm = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { afterPermission() }
+
+    private fun afterPermission() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            status.text = "위치 권한이 없어 시작할 수 없습니다. 설정 화면에서 '필수 권한 한 번에 설정'을 눌러주세요."
+            return
+        }
+        // 화면 꺼짐 대비 서비스를 같이 켠다
+        if (!DriveService.running) DriveControl.start(this)
+        try {
+            initKakao()
+        } catch (e: Throwable) {
+            CrashLog.save(this, e)
+            status.text = "카카오 시작 오류: ${e.javaClass.simpleName} ${e.message}"
+        }
     }
 
     private fun initKakao() {
@@ -83,14 +106,19 @@ class DriveActivity : AppCompatActivity(),
             status.text = "설정에서 카카오 앱 키를 먼저 입력해 주세요"
             return
         }
-        status.text = "카카오내비 연결 중…"
+        status.text = "카카오내비 연결 중… (계속 이 문구면 키·키해시 확인 필요)"
         KNSDK.initializeWithAppKey(prefs.kakaoKey, BuildConfig.VERSION_NAME, prefs.userKey) { error: KNError? ->
             runOnUiThread {
                 if (error != null) {
                     status.text = "카카오 인증 실패: ${error.code} ${error.msg}"
                     Toast.makeText(this, "카카오 인증 실패 (${error.code})", Toast.LENGTH_LONG).show()
                 } else {
-                    startSafetyMode()
+                    try {
+                        startSafetyMode()
+                    } catch (e: Throwable) {
+                        CrashLog.save(this, e)
+                        status.text = "안전운행 시작 오류: ${e.javaClass.simpleName} ${e.message}"
+                    }
                 }
             }
         }
