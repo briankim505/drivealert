@@ -76,6 +76,47 @@ object Schedule {
 
     fun timeText(ms: Long): String = SimpleDateFormat("a h:mm", Locale.KOREA).format(ms)
 
+    /**
+     * 차에 연결되면 자동 실행: 다음 일정 목적지를 찾아 '누르지 않아도' 테슬라로 바로 보낸다.
+     * 이미 그 근처(300m 이내)에 있거나, 같은 일정으로 이미 보냈으면 보내지 않는다.
+     * @return 보냈으면 true (백그라운드 스레드)
+     */
+    fun autoSend(ctx: Context, withinHours: Int): Boolean {
+        val prefs = Prefs(ctx)
+        if (!Tesla.installed(ctx)) return false
+        val ev = upcoming(ctx, withinHours).firstOrNull { !isOnline(it) && !prefs.wasNotified(it.id, it.begin) }
+            ?: return false
+        val place = guessPlaces(ctx, ev).firstOrNull() ?: return false
+        val here = Places.lastLocation(ctx)
+        if (here != null && place.lat != 0.0) {
+            val d = FloatArray(1)
+            android.location.Location.distanceBetween(here.first, here.second, place.lat, place.lon, d)
+            if (d[0] < 300f) return false // 이미 목적지 근처
+        }
+        prefs.markNotified(ev.id, ev.begin)
+        try {
+            ctx.startActivity(Tesla.shareIntent(place))
+        } catch (e: Exception) {
+            CrashLog.save(ctx, e)
+            return false
+        }
+        val req = (ev.id % 100000).toInt()
+        val change = PendingIntent.getActivity(
+            ctx, req + 2, Intent(ctx, DestinationActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val guessed = if (ev.location.isBlank()) " (제목으로 추정)" else ""
+        val n = NotificationCompat.Builder(ctx, App.CHANNEL_DRIVE)
+            .setSmallIcon(R.drawable.ic_notify)
+            .setContentTitle("테슬라로 목적지 보냄: ${place.name}")
+            .setContentText("${timeText(ev.begin)} ${ev.title}$guessed · 바꾸려면 누르세요")
+            .setContentIntent(change)
+            .setAutoCancel(true)
+            .build()
+        ctx.getSystemService(NotificationManager::class.java).notify(1000 + req, n)
+        return true
+    }
+
     /** 다음 일정 장소를 찾아 '테슬라로 보내기' 알림을 띄운다 (백그라운드 스레드) */
     fun notifyNext(ctx: Context, withinHours: Int, onlyOnce: Boolean): Boolean {
         val prefs = Prefs(ctx)

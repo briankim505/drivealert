@@ -169,18 +169,24 @@ class MainActivity : AppCompatActivity() {
         }
 
         title("6. 테슬라로 목적지 보내기")
-        note("캘린더 일정 장소(없으면 제목으로 추정)를 테슬라 앱 공유로 차량 내비에 보냅니다.")
-        button("목적지 보내기 화면 열기") { startActivity(Intent(this, DestinationActivity::class.java)) }
+        note("차에 연결되면 3시간 이내 다음 일정 장소(없으면 제목으로 추정)를 자동으로 테슬라 내비에 보냅니다. 다른 곳으로 가려면 알림을 눌러 바꾸면 됩니다.")
+        button("목적지 보내기 화면 열기 (직접 선택·자주 가는 곳)") { startActivity(Intent(this, DestinationActivity::class.java)) }
+        button("자동 전송 지금 시험해 보기") {
+            Thread {
+                val ok = Schedule.autoSend(this, withinHours = 24)
+                runOnUiThread { if (!ok) toast("보낼 일정이 없거나 이미 보냈습니다 (24시간 이내, 장소 추정 가능한 일정)") }
+            }.start()
+        }
         note("장소 검색용 '카카오 REST API 키' (같은 카카오 앱의 플랫폼 키 화면에 있음)")
         val restInput = EditText(this).apply {
             hint = "REST API 키"; setText(prefs.kakaoRestKey); isSingleLine = true
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         }.also { col.addView(it) }
         button("REST 키 저장") { prefs.kakaoRestKey = restInput.text.toString(); toast("저장했습니다") }
-        switch("일정 1시간 전쯤 '테슬라로 보내기' 알림", { prefs.notifyBefore }) {
+        switch("차에 연결되면 다음 일정 목적지 자동 전송", { prefs.suggestOnConnect }) { prefs.suggestOnConnect = it }
+        switch("(선택) 일정 1시간 전 미리 알림", { prefs.notifyBefore }) {
             prefs.notifyBefore = it; PlannerWorker.schedule(this)
         }
-        switch("차에 연결되면 다음 일정 장소 제안", { prefs.suggestOnConnect }) { prefs.suggestOnConnect = it }
 
         title("7. 주행")
         button("지금 주행 화면 열기 (테스트)") { startActivity(Intent(this, DriveActivity::class.java)) }

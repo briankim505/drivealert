@@ -7,7 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-data class Place(val name: String, val address: String, val category: String = "") {
+data class Place(val name: String, val address: String, val category: String = "", val lat: Double = 0.0, val lon: Double = 0.0) {
     /** 테슬라로 보낼 문자열 (이름 + 주소) */
     val shareText get() = if (name.isNotBlank() && name != address) "$name\n$address" else address
 }
@@ -47,7 +47,8 @@ object Places {
             Place(
                 d.optString("place_name"),
                 d.optString("road_address_name").ifBlank { d.optString("address_name") },
-                d.optString("category_name").substringAfterLast("> ")
+                d.optString("category_name").substringAfterLast("> "),
+                d.optString("y").toDoubleOrNull() ?: 0.0, d.optString("x").toDoubleOrNull() ?: 0.0
             )
         }
     }
@@ -58,12 +59,12 @@ object Places {
             val d = arr.getJSONObject(i)
             val road = d.optJSONObject("road_address")?.optString("address_name").orEmpty()
             val addr = road.ifBlank { d.optString("address_name") }
-            Place(addr, addr)
+            Place(addr, addr, "", d.optString("y").toDoubleOrNull() ?: 0.0, d.optString("x").toDoubleOrNull() ?: 0.0)
         }
     }
 
     @Suppress("MissingPermission")
-    private fun lastLocation(ctx: Context): Pair<Double, Double>? = try {
+    fun lastLocation(ctx: Context): Pair<Double, Double>? = try {
         val lm = ctx.getSystemService(LocationManager::class.java)
         (lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)
             ?: lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER))?.let { it.latitude to it.longitude }

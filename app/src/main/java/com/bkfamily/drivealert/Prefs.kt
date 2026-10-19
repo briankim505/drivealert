@@ -83,7 +83,7 @@ class Prefs(context: Context) {
 
     /** 일정 시작 1시간 전쯤 알림 */
     var notifyBefore: Boolean
-        get() = sp.getBoolean("notifyBefore", true)
+        get() = sp.getBoolean("notifyBefore", false)
         set(v) = sp.edit().putBoolean("notifyBefore", v).apply()
 
     /** 차에 연결되면 다음 일정 장소 제안 */
