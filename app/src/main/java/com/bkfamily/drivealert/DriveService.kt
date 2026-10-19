@@ -69,6 +69,7 @@ class DriveService : Service(), LocationListener {
         }
 
         startLocation()
+        Volume.onDriveStart(this)
         if (Prefs(this).suggestOnConnect) {
             // 차에 타면: ① 3시간 이내 다음 일정 목적지를 테슬라로 자동 전송 → ② 잠시 뒤 단속 알림 화면
             Thread {
@@ -118,6 +119,7 @@ class DriveService : Service(), LocationListener {
 
     override fun onDestroy() {
         running = false
+        Volume.onDriveEnd(this)
         try {
             getSystemService(LocationManager::class.java).removeUpdates(this)
         } catch (_: Exception) {

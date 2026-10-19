@@ -132,7 +132,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     private fun tone(times: Int) {
         Thread {
             try {
-                val tg = ToneGenerator(AudioManager.STREAM_ALARM, 90)
+                val tg = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
                 repeat(times) { tg.startTone(ToneGenerator.TONE_PROP_BEEP, 180); Thread.sleep(300) }
                 tg.release()
             } catch (_: Exception) {

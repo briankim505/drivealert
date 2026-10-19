@@ -76,6 +76,24 @@ class Prefs(context: Context) {
         get() = sp.getFloat("ttsPitch", 1.0f)
         set(v) = sp.edit().putFloat("ttsPitch", v).apply()
 
+    // ---- 음량 ----
+    var volumeAuto: Boolean
+        get() = sp.getBoolean("volumeAuto", true)
+        set(v) = sp.edit().putBoolean("volumeAuto", v).apply()
+
+    /** 주행 시작 시 맞출 미디어 음량(%) */
+    var volumeLevel: Int
+        get() = sp.getInt("volumeLevel", 60)
+        set(v) = sp.edit().putInt("volumeLevel", v).apply()
+
+    var volumeRestore: Boolean
+        get() = sp.getBoolean("volumeRestore", true)
+        set(v) = sp.edit().putBoolean("volumeRestore", v).apply()
+
+    var savedVolume: Int
+        get() = sp.getInt("savedVolume", -1)
+        set(v) = sp.edit().putInt("savedVolume", v).apply()
+
     // ---- 테슬라 목적지 보내기 ----
     var kakaoRestKey: String
         get() = sp.getString("kakaoRestKey", "") ?: ""

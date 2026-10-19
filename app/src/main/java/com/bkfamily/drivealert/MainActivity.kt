@@ -160,6 +160,11 @@ class MainActivity : AppCompatActivity() {
         choice("목소리 높낮이", listOf("낮게", "보통", "높게"), listOf(0.8f, 1.0f, 1.25f),
             { prefs.ttsPitch }) { prefs.ttsPitch = it as Float }
         switch("경고할 때 현재 속도도 말하기", { prefs.speakSpeed }) { prefs.speakSpeed = it }
+        switch("주행 시작 시 음량 자동으로 올리기", { prefs.volumeAuto }) { prefs.volumeAuto = it }
+        choice("맞출 음량", listOf("30%", "40%", "50%", "60%", "70%", "80%", "100%"), listOf(30, 40, 50, 60, 70, 80, 100),
+            { prefs.volumeLevel }) { prefs.volumeLevel = it as Int }
+        note("지금 음량이 이보다 낮을 때만 올립니다 (0이어도 올림).")
+        switch("주행 끝나면 원래 음량으로 되돌리기", { prefs.volumeRestore }) { prefs.volumeRestore = it }
         button("목소리 종류 바꾸기 (휴대폰 음성 설정)") {
             try { startActivity(Intent("com.android.settings.TTS_SETTINGS")) } catch (_: Exception) { toast("음성 설정을 열 수 없습니다") }
         }
