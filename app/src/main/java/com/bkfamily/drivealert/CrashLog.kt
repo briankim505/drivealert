@@ -9,7 +9,11 @@ object CrashLog {
 
     fun save(c: Context, e: Throwable) {
         try {
-            val text = "버전 ${BuildConfig.VERSION_NAME}\n" + e.stackTraceToString().lines().take(25).joinToString("\n")
+            var root: Throwable = e
+            while (root.cause != null && root.cause !== root) root = root.cause!!
+            val text = "버전 ${BuildConfig.VERSION_NAME}\n[원인] ${root.javaClass.name}: ${root.message}\n" +
+                root.stackTrace.take(8).joinToString("\n") { "  at $it" } +
+                "\n\n[전체]\n" + e.stackTraceToString().lines().take(15).joinToString("\n")
             file(c).writeText(text)
         } catch (_: Exception) {
         }

@@ -4,8 +4,8 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <com.kakaomobility.knsdk.ui.view.KNNaviView
-        android:id="@+id/navi_view"
+    <FrameLayout
+        android:id="@+id/navi_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 

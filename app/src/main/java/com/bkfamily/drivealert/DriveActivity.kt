@@ -61,7 +61,6 @@ class DriveActivity : AppCompatActivity(),
             setTurnScreenOn(true)
         }
         setContentView(R.layout.activity_drive)
-        naviView = findViewById(R.id.navi_view)
         status = findViewById(R.id.status)
         findViewById<android.view.View>(R.id.btn_close).setOnClickListener { DriveControl.stop(this) }
 
@@ -125,6 +124,14 @@ class DriveActivity : AppCompatActivity(),
     }
 
     private fun startSafetyMode() {
+        // 카카오 SDK 인증이 끝난 뒤에 주행 화면을 만들어야 함
+        naviView = KNNaviView(this)
+        findViewById<android.widget.FrameLayout>(R.id.navi_container).addView(
+            naviView,
+            android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
         val guidance = KNSDK.sharedGuidance() ?: run {
             status.text = "안내 기능을 시작하지 못했습니다"
             return
