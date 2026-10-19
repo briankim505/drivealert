@@ -11,12 +11,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.kakaomobility.knsdk.KNLanguageType
 import com.kakaomobility.knsdk.KNRouteAvoidOption
 import com.kakaomobility.knsdk.KNRoutePriority
 import com.kakaomobility.knsdk.KNSDK
 import com.kakaomobility.knsdk.common.objects.KNError
 import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuideRouteChangeReason
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuideState
+import com.kakaomobility.knsdk.guidance.knguidance.common.KNLocation
 import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_GuideStateDelegate
 import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_LocationGuideDelegate
 import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_RouteGuideDelegate
@@ -30,6 +32,7 @@ import com.kakaomobility.knsdk.guidance.knguidance.safetyguide.objects.KNSafety
 import com.kakaomobility.knsdk.guidance.knguidance.voiceguide.KNGuide_Voice
 import com.kakaomobility.knsdk.trip.kntrip.knroute.KNRoute
 import com.kakaomobility.knsdk.ui.view.KNNaviView
+import com.kakaomobility.knsdk.ui.view.KNNaviView_GuideStateDelegate
 
 /**
  * 주행 화면 = 카카오내비 '안전운행 모드'(목적지 없이 단속카메라·제한속도·과속 경고).
@@ -40,7 +43,8 @@ class DriveActivity : AppCompatActivity(),
     KNGuidance_LocationGuideDelegate,
     KNGuidance_RouteGuideDelegate,
     KNGuidance_SafetyGuideDelegate,
-    KNGuidance_VoiceGuideDelegate {
+    KNGuidance_VoiceGuideDelegate,
+    KNNaviView_GuideStateDelegate {
 
     private lateinit var naviView: KNNaviView
     private lateinit var status: TextView
@@ -80,10 +84,7 @@ class DriveActivity : AppCompatActivity(),
             return
         }
         status.text = "카카오내비 연결 중…"
-        KNSDK.initializeWithAppKey(
-            prefs.kakaoKey, BuildConfig.VERSION_NAME, prefs.userKey,
-            KNLanguageType.KNLanguageType_KOREAN
-        ) { error: KNError? ->
+        KNSDK.initializeWithAppKey(prefs.kakaoKey, BuildConfig.VERSION_NAME, prefs.userKey) { error: KNError? ->
             runOnUiThread {
                 if (error != null) {
                     status.text = "카카오 인증 실패: ${error.code} ${error.msg}"
@@ -143,7 +144,15 @@ class DriveActivity : AppCompatActivity(),
     override fun guidanceRouteUnchangedWithError(aGuidnace: KNGuidance, aError: KNError) =
         naviView.guidanceRouteUnchangedWithError(aGuidnace, aError)
     override fun guidanceOutOfRoute(aGuidance: KNGuidance) = naviView.guidanceOutOfRoute(aGuidance)
-    override fun guidanceRouteChanged(aGuidance: KNGuidance) = naviView.guidanceRouteChanged(aGuidance)
+    override fun guidanceRouteChanged(
+        aGuidance: KNGuidance, aFromRoute: KNRoute, aFromLocation: KNLocation,
+        aToRoute: KNRoute, aToLocation: KNLocation, aChangeReason: KNGuideRouteChangeReason
+    ) = naviView.guidanceRouteChanged(aGuidance)
+    override fun guidanceDidUpdateIndoorRoute(aGuidance: KNGuidance, aRoute: KNRoute?) {}
+
+    // 주행 화면에서 사용자가 '안내 종료'를 누른 경우
+    override fun naviViewGuideState(state: KNGuideState) {}
+    override fun naviViewGuideEnded() = DriveControl.stop(this)
     override fun guidanceGuideEnded(aGuidance: KNGuidance) = naviView.guidanceGuideEnded(aGuidance, false)
     override fun guidanceDidUpdateRoutes(aGuidance: KNGuidance, aRoutes: List<KNRoute>, aMultiRouteInfo: KNMultiRouteInfo?) =
         naviView.guidanceDidUpdateRoutes(aGuidance, aRoutes, aMultiRouteInfo)
