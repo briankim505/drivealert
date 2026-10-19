@@ -36,7 +36,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            if (System.getenv("KEYSTORE_PATH") != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

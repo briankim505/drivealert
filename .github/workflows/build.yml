@@ -25,13 +25,14 @@ jobs:
 
       - name: Restore signing key
         env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          if [ -n "$KEYSTORE_PASSWORD" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in signing/release.jks.enc \
+              -out "$RUNNER_TEMP/release.jks" -pass env:KEYSTORE_PASSWORD
             echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           else
-            echo "::warning::KEYSTORE_B64 secret missing - APK will be unsigned"
+            echo "::warning::KEYSTORE_PASSWORD secret missing - APK will be unsigned (compile check only)"
           fi
 
       - name: Build
