@@ -183,6 +183,7 @@ class MainActivity : AppCompatActivity() {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         }.also { col.addView(it) }
         button("REST 키 저장") { prefs.kakaoRestKey = restInput.text.toString(); toast("저장했습니다") }
+        button("일정을 볼 캘린더 선택") { chooseCalendars() }
         switch("차에 연결되면 다음 일정 목적지 자동 전송", { prefs.suggestOnConnect }) { prefs.suggestOnConnect = it }
         switch("(선택) 일정 1시간 전 미리 알림", { prefs.notifyBefore }) {
             prefs.notifyBefore = it; PlannerWorker.schedule(this)
@@ -351,6 +352,22 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }.start()
+    }
+
+    private fun chooseCalendars() {
+        val cals = Schedule.calendars(this)
+        if (cals.isEmpty()) { toast("캘린더 권한을 먼저 허용해 주세요 ('필수 권한 한 번에 설정')"); return }
+        val sel = prefs.calendarIds
+        val checked = BooleanArray(cals.size) { sel.isEmpty() || cals[it].id.toString() in sel }
+        AlertDialog.Builder(this)
+            .setTitle("목적지를 찾을 캘린더")
+            .setMultiChoiceItems(cals.map { "${it.name}\n${it.account}" }.toTypedArray(), checked) { _, i, v -> checked[i] = v }
+            .setPositiveButton("저장") { _, _ ->
+                val ids = cals.filterIndexed { i, _ -> checked[i] }.map { it.id.toString() }.toSet()
+                prefs.calendarIds = if (ids.size == cals.size) emptySet() else ids
+                toast("${ids.size}개 캘린더를 봅니다")
+            }
+            .setNegativeButton("취소", null).show()
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_SHORT).show()

@@ -33,7 +33,14 @@ object Places {
         c.setRequestProperty("Authorization", "KakaoAK $key")
         c.connectTimeout = 8000; c.readTimeout = 8000
         if (c.responseCode == 200) JSONObject(c.inputStream.bufferedReader().readText())
-        else { lastError = "카카오 검색 오류 ${c.responseCode}"; null }
+        else {
+            val body = try { c.errorStream?.bufferedReader()?.readText().orEmpty() } catch (_: Exception) { "" }
+            val msg = try { JSONObject(body).optString("message") } catch (_: Exception) { body.take(120) }
+            lastError = if (c.responseCode == 403 && msg.contains("OPEN_MAP_AND_LOCAL", true))
+                "카카오 403: 카카오디벨로퍼스에서 '카카오맵' 사용 설정을 켜야 합니다"
+            else "카카오 검색 오류 ${c.responseCode}: $msg"
+            null
+        }
     } catch (e: Exception) {
         lastError = "카카오 검색 실패: ${e.message}"; null
     }

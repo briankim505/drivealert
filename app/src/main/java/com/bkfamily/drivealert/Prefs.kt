@@ -102,6 +102,11 @@ class Prefs(context: Context) {
             sp.edit().putString("favorites", a.toString()).apply()
         }
 
+    /** 일정을 볼 캘린더 ID 목록 (비어 있으면 전체) */
+    var calendarIds: Set<String>
+        get() = sp.getStringSet("calendarIds", emptySet())!!
+        set(v) = sp.edit().putStringSet("calendarIds", v).apply()
+
     fun wasNotified(id: Long, begin: Long) = sp.getStringSet("notified", emptySet())!!.contains("$id@$begin")
     fun markNotified(id: Long, begin: Long) {
         val now = System.currentTimeMillis()

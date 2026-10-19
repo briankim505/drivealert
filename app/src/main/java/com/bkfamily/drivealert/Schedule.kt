@@ -13,6 +13,8 @@ import androidx.core.content.ContextCompat
 import java.text.SimpleDateFormat
 import java.util.Locale
 
+data class CalInfo(val id: Long, val account: String, val name: String)
+
 data class CalEvent(val id: Long, val title: String, val location: String, val begin: Long, val calendar: String)
 
 /** 휴대폰에 동기화된 구글 캘린더(개인·회사 모두)에서 다가오는 일정과 장소를 찾는다 */
@@ -20,6 +22,22 @@ object Schedule {
 
     fun hasPermission(ctx: Context) =
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+
+    /** 휴대폰에 있는 캘린더 목록 (계정별) */
+    fun calendars(ctx: Context): List<CalInfo> {
+        if (!hasPermission(ctx)) return emptyList()
+        val out = mutableListOf<CalInfo>()
+        try {
+            ctx.contentResolver.query(
+                CalendarContract.Calendars.CONTENT_URI,
+                arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.ACCOUNT_NAME,
+                    CalendarContract.Calendars.CALENDAR_DISPLAY_NAME),
+                null, null, "${CalendarContract.Calendars.ACCOUNT_NAME} ASC"
+            )?.use { c -> while (c.moveToNext()) out += CalInfo(c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "") }
+        } catch (_: Exception) {
+        }
+        return out
+    }
 
     /** 지금부터 hours 시간 안의 일정 (종일 일정 제외, 시간순) */
     fun upcoming(ctx: Context, hours: Int): List<CalEvent> {
@@ -33,12 +51,14 @@ object Schedule {
             CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.TITLE,
             CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.BEGIN,
             CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
-            CalendarContract.Instances.SELF_ATTENDEE_STATUS
+            CalendarContract.Instances.SELF_ATTENDEE_STATUS, CalendarContract.Instances.CALENDAR_ID
         )
+        val allowed = Prefs(ctx).calendarIds
         val out = mutableListOf<CalEvent>()
         try {
             ctx.contentResolver.query(uri, cols, null, null, "${CalendarContract.Instances.BEGIN} ASC")?.use { c ->
                 while (c.moveToNext()) {
+                    if (allowed.isNotEmpty() && c.getLong(7).toString() !in allowed) continue // 선택 안 한 캘린더
                     if (c.getInt(4) == 1) continue // 종일 일정
                     if (c.getInt(6) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                     if (c.getLong(3) < now - 10 * 60_000) continue
