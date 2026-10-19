@@ -76,6 +76,41 @@ class Prefs(context: Context) {
         get() = sp.getFloat("ttsPitch", 1.0f)
         set(v) = sp.edit().putFloat("ttsPitch", v).apply()
 
+    // ---- 테슬라 목적지 보내기 ----
+    var kakaoRestKey: String
+        get() = sp.getString("kakaoRestKey", "") ?: ""
+        set(v) = sp.edit().putString("kakaoRestKey", v.trim()).apply()
+
+    /** 일정 시작 1시간 전쯤 알림 */
+    var notifyBefore: Boolean
+        get() = sp.getBoolean("notifyBefore", true)
+        set(v) = sp.edit().putBoolean("notifyBefore", v).apply()
+
+    /** 차에 연결되면 다음 일정 장소 제안 */
+    var suggestOnConnect: Boolean
+        get() = sp.getBoolean("suggestOnConnect", true)
+        set(v) = sp.edit().putBoolean("suggestOnConnect", v).apply()
+
+    var favorites: List<Place>
+        get() = try {
+            val a = org.json.JSONArray(sp.getString("favorites", "[]"))
+            (0 until a.length()).map { val o = a.getJSONObject(it); Place(o.getString("n"), o.getString("a")) }
+        } catch (_: Exception) { emptyList() }
+        set(v) {
+            val a = org.json.JSONArray()
+            v.forEach { a.put(org.json.JSONObject().put("n", it.name).put("a", it.address)) }
+            sp.edit().putString("favorites", a.toString()).apply()
+        }
+
+    fun wasNotified(id: Long, begin: Long) = sp.getStringSet("notified", emptySet())!!.contains("$id@$begin")
+    fun markNotified(id: Long, begin: Long) {
+        val now = System.currentTimeMillis()
+        val keep = sp.getStringSet("notified", emptySet())!!
+            .filter { (it.substringAfter('@').toLongOrNull() ?: 0) > now - 86_400_000L }.toMutableSet()
+        keep += "$id@$begin"
+        sp.edit().putStringSet("notified", keep).apply()
+    }
+
     /** 앱 사용자를 구분하는 임의 ID (카카오 SDK userKey) */
     val userKey: String
         get() {

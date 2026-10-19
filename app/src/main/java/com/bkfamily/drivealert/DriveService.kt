@@ -70,6 +70,10 @@ class DriveService : Service(), LocationListener {
 
         startLocation()
         openDriveScreen()
+        // 차에 타면 3시간 이내 다음 일정 장소를 '테슬라로 보내기' 알림으로 제안
+        if (Prefs(this).suggestOnConnect) Thread {
+            try { Schedule.notifyNext(this, withinHours = 3, onlyOnce = false) } catch (_: Exception) {}
+        }.start()
     }
 
     private fun openDriveScreen() {

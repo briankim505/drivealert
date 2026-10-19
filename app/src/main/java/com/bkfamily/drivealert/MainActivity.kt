@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
         prefs = Prefs(this)
         setContentView(buildUi())
         Updater.check(this, silent = true)
+        PlannerWorker.schedule(this)
         CrashLog.take(this)?.let { log ->
             AlertDialog.Builder(this)
                 .setTitle("지난번 오류 기록")
@@ -167,13 +168,27 @@ class MainActivity : AppCompatActivity() {
             col.postDelayed({ e.preview() }, 700)
         }
 
-        title("6. 주행")
+        title("6. 테슬라로 목적지 보내기")
+        note("캘린더 일정 장소(없으면 제목으로 추정)를 테슬라 앱 공유로 차량 내비에 보냅니다.")
+        button("목적지 보내기 화면 열기") { startActivity(Intent(this, DestinationActivity::class.java)) }
+        note("장소 검색용 '카카오 REST API 키' (같은 카카오 앱의 플랫폼 키 화면에 있음)")
+        val restInput = EditText(this).apply {
+            hint = "REST API 키"; setText(prefs.kakaoRestKey); isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        }.also { col.addView(it) }
+        button("REST 키 저장") { prefs.kakaoRestKey = restInput.text.toString(); toast("저장했습니다") }
+        switch("일정 1시간 전쯤 '테슬라로 보내기' 알림", { prefs.notifyBefore }) {
+            prefs.notifyBefore = it; PlannerWorker.schedule(this)
+        }
+        switch("차에 연결되면 다음 일정 장소 제안", { prefs.suggestOnConnect }) { prefs.suggestOnConnect = it }
+
+        title("7. 주행")
         button("지금 주행 화면 열기 (테스트)") { startActivity(Intent(this, DriveActivity::class.java)) }
         button("주차 위치 보기") { showParking() }
         button("이번 달 운행기록 내보내기") { exportTrips(0) }
         button("지난 달 운행기록 내보내기") { exportTrips(-1) }
 
-        title("7. 앱 정보")
+        title("8. 앱 정보")
         note("버전 ${BuildConfig.VERSION_NAME}")
         button("업데이트 확인") { Updater.check(this, silent = false) }
 
@@ -252,7 +267,8 @@ class MainActivity : AppCompatActivity() {
     private fun nextPermissionStep() {
         when (permStep++) {
             0 -> {
-                val list = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                val list = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.READ_CALENDAR)
                 if (Build.VERSION.SDK_INT >= 33) list += Manifest.permission.POST_NOTIFICATIONS
                 if (Build.VERSION.SDK_INT >= 31) list += Manifest.permission.BLUETOOTH_CONNECT
                 val missing = list.filter { !has(it) }
