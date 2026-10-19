@@ -1,0 +1,65 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Restore signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::KEYSTORE_B64 secret missing - APK will be unsigned"
+          fi
+
+      - name: Build
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: List Kakao SDK classes (for debugging)
+        if: always()
+        run: |
+          AAR=$(find ~/.gradle/caches -name 'knsdk_ui*.aar' | head -1)
+          echo "AAR: $AAR"
+          for a in $(find ~/.gradle/caches -name 'knsdk*.aar'); do
+            mkdir -p /tmp/k && unzip -o -q "$a" classes.jar -d /tmp/k && \
+            unzip -l /tmp/k/classes.jar | awk '{print $4}' | grep -E '/KN(SDK|Guidance|Guide_|Safety|NaviView|Error|LanguageType|Route(Priority|AvoidOption)|MultiRouteInfo|Route)[A-Za-z_]*\.class$' | grep -v '\$' | sort -u
+          done
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DriveAlert-1.0.${{ github.run_number }}
+          path: app/build/outputs/apk/release/*.apk
+
+      - name: Publish release
+        if: env.KEYSTORE_PATH != ''
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "DriveAlert-1.0.${{ github.run_number }}.apk"
+          gh release create "v1.0.${{ github.run_number }}" "DriveAlert-1.0.${{ github.run_number }}.apk" \
+            --title "드라이브 알리미 1.0.${{ github.run_number }}" --notes "자동 빌드"
+        env:
+          GH_TOKEN: ${{ github.token }}

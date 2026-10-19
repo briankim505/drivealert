@@ -1,0 +1,172 @@
+package com.bkfamily.drivealert
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import android.os.Bundle
+import android.view.WindowManager
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.kakaomobility.knsdk.KNLanguageType
+import com.kakaomobility.knsdk.KNRouteAvoidOption
+import com.kakaomobility.knsdk.KNRoutePriority
+import com.kakaomobility.knsdk.KNSDK
+import com.kakaomobility.knsdk.common.objects.KNError
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_GuideStateDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_LocationGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_RouteGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_SafetyGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.KNGuidance_VoiceGuideDelegate
+import com.kakaomobility.knsdk.guidance.knguidance.locationguide.KNGuide_Location
+import com.kakaomobility.knsdk.guidance.knguidance.routeguide.KNGuide_Route
+import com.kakaomobility.knsdk.guidance.knguidance.routeguide.objects.KNMultiRouteInfo
+import com.kakaomobility.knsdk.guidance.knguidance.safetyguide.KNGuide_Safety
+import com.kakaomobility.knsdk.guidance.knguidance.safetyguide.objects.KNSafety
+import com.kakaomobility.knsdk.guidance.knguidance.voiceguide.KNGuide_Voice
+import com.kakaomobility.knsdk.trip.kntrip.knroute.KNRoute
+import com.kakaomobility.knsdk.ui.view.KNNaviView
+
+/**
+ * 주행 화면 = 카카오내비 '안전운행 모드'(목적지 없이 단속카메라·제한속도·과속 경고).
+ * 음성 안내는 카카오내비 SDK가 직접 재생하며, 블루투스로 차량 스피커에서 나온다.
+ */
+class DriveActivity : AppCompatActivity(),
+    KNGuidance_GuideStateDelegate,
+    KNGuidance_LocationGuideDelegate,
+    KNGuidance_RouteGuideDelegate,
+    KNGuidance_SafetyGuideDelegate,
+    KNGuidance_VoiceGuideDelegate {
+
+    private lateinit var naviView: KNNaviView
+    private lateinit var status: TextView
+    private var started = false
+
+    private val stopReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) = finishDrive()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= 27) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
+        setContentView(R.layout.activity_drive)
+        naviView = findViewById(R.id.navi_view)
+        status = findViewById(R.id.status)
+        findViewById<android.view.View>(R.id.btn_close).setOnClickListener { DriveControl.stop(this) }
+
+        if (Prefs(this).keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        ContextCompat.registerReceiver(
+            this, stopReceiver, IntentFilter(DriveControl.ACTION_STOP), ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        // 수동으로 연 경우에도 서비스(화면 꺼짐 대비)를 같이 켠다
+        if (!DriveService.running) DriveControl.start(this)
+
+        initKakao()
+    }
+
+    private fun initKakao() {
+        val prefs = Prefs(this)
+        if (prefs.kakaoKey.isEmpty()) {
+            status.text = "설정에서 카카오 앱 키를 먼저 입력해 주세요"
+            return
+        }
+        status.text = "카카오내비 연결 중…"
+        KNSDK.initializeWithAppKey(
+            prefs.kakaoKey, BuildConfig.VERSION_NAME, prefs.userKey,
+            KNLanguageType.KNLanguageType_KOREAN
+        ) { error: KNError? ->
+            runOnUiThread {
+                if (error != null) {
+                    status.text = "카카오 인증 실패: ${error.code} ${error.msg}"
+                    Toast.makeText(this, "카카오 인증 실패 (${error.code})", Toast.LENGTH_LONG).show()
+                } else {
+                    startSafetyMode()
+                }
+            }
+        }
+    }
+
+    private fun startSafetyMode() {
+        val guidance = KNSDK.sharedGuidance() ?: run {
+            status.text = "안내 기능을 시작하지 못했습니다"
+            return
+        }
+        guidance.guideStateDelegate = this
+        guidance.locationGuideDelegate = this
+        guidance.routeGuideDelegate = this
+        guidance.safetyGuideDelegate = this
+        guidance.voiceGuideDelegate = this
+        guidance.useBackgroundUpdate = true
+        naviView.guideStateDelegate = this
+        // 경로(trip) 없이 시작 = 안전운행 모드
+        naviView.initWithGuidance(
+            guidance, null,
+            KNRoutePriority.KNRoutePriority_Recommand,
+            KNRouteAvoidOption.KNRouteAvoidOption_None.value
+        )
+        started = true
+        status.text = "단속카메라 알림 작동 중"
+    }
+
+    private fun finishDrive() {
+        if (started) {
+            try { KNSDK.sharedGuidance()?.stop() } catch (_: Exception) {}
+            started = false
+        }
+        finish()
+    }
+
+    // ---- 앱 상태를 SDK에 전달 (화면 꺼짐/켜짐 대응) ----
+    override fun onResume() { super.onResume(); KNSDK.handleDidBecomeActive() }
+    override fun onPause() { KNSDK.handleWillResignActive(); super.onPause() }
+    override fun onStart() { super.onStart(); KNSDK.handleWillEnterForeground() }
+    override fun onStop() { KNSDK.handleDidEnterBackground(); super.onStop() }
+
+    override fun onDestroy() {
+        try { unregisterReceiver(stopReceiver) } catch (_: Exception) {}
+        super.onDestroy()
+    }
+
+    // ---- 카카오 SDK 콜백: 그대로 주행 화면(KNNaviView)에 전달 ----
+    override fun guidanceGuideStarted(aGuidance: KNGuidance) = naviView.guidanceGuideStarted(aGuidance)
+    override fun guidanceCheckingRouteChange(aGuidance: KNGuidance) = naviView.guidanceCheckingRouteChange(aGuidance)
+    override fun guidanceRouteUnchanged(aGuidance: KNGuidance) = naviView.guidanceRouteUnchanged(aGuidance)
+    override fun guidanceRouteUnchangedWithError(aGuidnace: KNGuidance, aError: KNError) =
+        naviView.guidanceRouteUnchangedWithError(aGuidnace, aError)
+    override fun guidanceOutOfRoute(aGuidance: KNGuidance) = naviView.guidanceOutOfRoute(aGuidance)
+    override fun guidanceRouteChanged(aGuidance: KNGuidance) = naviView.guidanceRouteChanged(aGuidance)
+    override fun guidanceGuideEnded(aGuidance: KNGuidance) = naviView.guidanceGuideEnded(aGuidance, false)
+    override fun guidanceDidUpdateRoutes(aGuidance: KNGuidance, aRoutes: List<KNRoute>, aMultiRouteInfo: KNMultiRouteInfo?) =
+        naviView.guidanceDidUpdateRoutes(aGuidance, aRoutes, aMultiRouteInfo)
+
+    override fun guidanceDidUpdateLocation(aGuidance: KNGuidance, aLocationGuide: KNGuide_Location) =
+        naviView.guidanceDidUpdateLocation(aGuidance, aLocationGuide)
+
+    override fun guidanceDidUpdateRouteGuide(aGuidance: KNGuidance, aRouteGuide: KNGuide_Route) =
+        naviView.guidanceDidUpdateRouteGuide(aGuidance, aRouteGuide)
+
+    override fun guidanceDidUpdateSafetyGuide(aGuidance: KNGuidance, aSafetyGuide: KNGuide_Safety?) =
+        naviView.guidanceDidUpdateSafetyGuide(aGuidance, aSafetyGuide)
+
+    override fun guidanceDidUpdateAroundSafeties(aGuidance: KNGuidance, aSafeties: List<KNSafety>?) =
+        naviView.guidanceDidUpdateAroundSafeties(aGuidance, aSafeties)
+
+    override fun shouldPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice, aNewData: MutableList<ByteArray>): Boolean =
+        naviView.shouldPlayVoiceGuide(aGuidance, aVoiceGuide, aNewData)
+
+    override fun willPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice) =
+        naviView.willPlayVoiceGuide(aGuidance, aVoiceGuide)
+
+    override fun didFinishPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice) =
+        naviView.didFinishPlayVoiceGuide(aGuidance, aVoiceGuide)
+
+}
