@@ -52,7 +52,8 @@ jobs:
             mkdir -p /tmp/kc && cd /tmp/kc && unzip -o -q /tmp/k/classes.jar && cd - >/dev/null
           done) > classes.txt 2>&1 || true
           # 주요 인터페이스 메서드 시그니처
-          for c in $(grep -E 'KNGuidance_[A-Za-z]+Delegate|ui/view/KNNaviView|/KNSDK.class' classes.txt); do
+          for c in $(grep -E 'KNGuidance_[A-Za-z]+Delegate|ui/view/KNNaviView|/KNSDK.class' classes.txt) \
+            $(cd /tmp/kc && find . -name 'KNGuidance.class' -o -name 'KNGuideFrequ*.class' -o -name 'KNGuide_Voice.class' -o -name 'KNVoiceCode.class' -o -name 'KNSafetyCode.class' -o -name 'KNSafety_Camera.class' -o -name 'KNSafety_Section.class' -o -name 'KNSafety.class' -o -name 'KNSpeedOverAlertOption.class' -o -name 'KNGuide_Location.class' -o -name 'KNGPSData.class' -o -name 'KNSoundPlayer*.class' | sed 's#^\./##'); do
             javap -cp /tmp/kc "${c%.class}" 2>/dev/null
           done > signatures.txt || true
 
