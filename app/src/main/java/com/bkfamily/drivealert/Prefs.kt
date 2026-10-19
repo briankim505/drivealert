@@ -77,6 +77,16 @@ class Prefs(context: Context) {
         get() = sp.getFloat("ttsRate", 1.0f)
         set(v) = sp.edit().putFloat("ttsRate", v).apply()
 
+    /** 음성 엔진 패키지 (빈 값 = 삼성 TTS 우선) */
+    var ttsEngine: String
+        get() = sp.getString("ttsEngine", "") ?: ""
+        set(v) = sp.edit().putString("ttsEngine", v).apply()
+
+    /** 엔진 안에서 고른 목소리 이름 (빈 값 = 기본) */
+    var ttsVoice: String
+        get() = sp.getString("ttsVoice", "") ?: ""
+        set(v) = sp.edit().putString("ttsVoice", v).apply()
+
     var ttsPitch: Float
         get() = sp.getFloat("ttsPitch", 1.0f)
         set(v) = sp.edit().putFloat("ttsPitch", v).apply()

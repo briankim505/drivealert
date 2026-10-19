@@ -170,11 +170,14 @@ class MainActivity : AppCompatActivity() {
             { prefs.volumeLevel }) { prefs.volumeLevel = it as Int }
         note("지금 음량이 이보다 낮을 때만 올립니다 (0이어도 올림).")
         switch("주행 끝나면 원래 음량으로 되돌리기", { prefs.volumeRestore }) { prefs.volumeRestore = it }
-        button("목소리 종류 바꾸기 (휴대폰 음성 설정)") {
+        button("음성 엔진 고르기 (삼성 / 구글)") { chooseEngine() }
+        button("목소리 고르기") { chooseVoice() }
+        button("(엔진 음성 데이터 설치·관리)") {
             try { startActivity(Intent("com.android.settings.TTS_SETTINGS")) } catch (_: Exception) { toast("음성 설정을 열 수 없습니다") }
         }
         button("미리 듣기") {
-            val e = previewEngine ?: AlertEngine(this).also { previewEngine = it }
+            previewEngine?.release()
+            val e = AlertEngine(this).also { previewEngine = it }
             col.postDelayed({ e.preview() }, 700)
         }
 
@@ -379,6 +382,45 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }.start()
+    }
+
+    private fun chooseEngine() {
+        val probe = android.speech.tts.TextToSpeech(this) {}
+        val engines = probe.engines
+        probe.shutdown()
+        if (engines.isEmpty()) { toast("설치된 음성 엔진이 없습니다"); return }
+        val cur = AlertEngine.engineFor(this)
+        AlertDialog.Builder(this).setTitle("음성 엔진")
+            .setSingleChoiceItems(engines.map { it.label }.toTypedArray(), engines.indexOfFirst { it.name == cur }) { d, i ->
+                prefs.ttsEngine = engines[i].name
+                prefs.ttsVoice = ""
+                toast("${engines[i].label} 선택. '목소리 고르기'로 목소리를 바꿀 수 있어요")
+                d.dismiss()
+            }.show()
+    }
+
+    private fun chooseVoice() {
+        toast("목소리 목록을 불러오는 중…")
+        var t: android.speech.tts.TextToSpeech? = null
+        t = android.speech.tts.TextToSpeech(this, { st ->
+            val tts = t ?: return@TextToSpeech
+            if (st != android.speech.tts.TextToSpeech.SUCCESS) { toast("음성 엔진을 열 수 없습니다"); tts.shutdown(); return@TextToSpeech }
+            val voices = (tts.voices ?: emptySet()).filter { it.locale.language == "ko" }.sortedBy { it.name }
+            if (voices.isEmpty()) { toast("한국어 목소리가 없습니다. 엔진 음성 데이터를 설치해 주세요"); tts.shutdown(); return@TextToSpeech }
+            runOnUiThread {
+                AlertDialog.Builder(this).setTitle("목소리 (누르면 미리 듣기)")
+                    .setSingleChoiceItems(voices.mapIndexed { i, v ->
+                        "목소리 ${i + 1}" + (if (v.isNetworkConnectionRequired) " (인터넷 필요)" else "") + "  · ${v.name}"
+                    }.toTypedArray(), voices.indexOfFirst { it.name == prefs.ttsVoice }) { _, i ->
+                        prefs.ttsVoice = voices[i].name
+                        tts.voice = voices[i]
+                        tts.speak("300미터 앞 과속 단속, 제한속도 60", android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "pv")
+                    }
+                    .setPositiveButton("확인") { _, _ -> tts.shutdown() }
+                    .setOnCancelListener { tts.shutdown() }
+                    .show()
+            }
+        }, AlertEngine.engineFor(this))
     }
 
     private fun chooseCalendars() {

@@ -43,13 +43,15 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     }
 
     private fun initTts() {
-        if (tts == null) tts = TextToSpeech(ctx, this)
+        if (tts == null) tts = TextToSpeech(ctx, this, engineFor(ctx))
     }
 
     override fun onInit(status: Int) {
         val t = tts ?: return
         if (status == TextToSpeech.SUCCESS) {
             t.language = Locale.KOREAN
+            val want = prefs.ttsVoice
+            if (want.isNotBlank()) t.voices?.firstOrNull { it.name == want }?.let { t.voice = it }
             t.setAudioAttributes(attrs)
             t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) {}
@@ -160,6 +162,15 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     }
 
     companion object {
+        const val SAMSUNG_TTS = "com.samsung.SMT"
+
+        /** 사용할 음성 엔진: 설정값 → 없으면 삼성 TTS(설치돼 있으면) → 기본 엔진 */
+        fun engineFor(ctx: Context): String? {
+            val p = Prefs(ctx).ttsEngine
+            if (p.isNotBlank()) return p
+            return try { ctx.packageManager.getPackageInfo(SAMSUNG_TTS, 0); SAMSUNG_TTS } catch (_: Exception) { null }
+        }
+
         /** 과속 단속 카메라 종류만 (고정식·구간·이동식·신호과속 겸용 등 'Speed'가 들어간 코드) */
         fun isSpeedCamera(code: String) = code.contains("Speed") && !code.contains("Hump")
 
