@@ -194,13 +194,29 @@ class MainActivity : AppCompatActivity() {
             prefs.notifyBefore = it; PlannerWorker.schedule(this)
         }
 
-        title("7. 주행")
+        title("7. 제미나이 (선택)")
+        note("넣으면: 일정 장소 추정이 똑똑해지고, 운행기록부 사용목적이 자동으로 채워지고, 음성 목적지 명령을 더 잘 알아듣습니다. aistudio.google.com에서 무료 발급.")
+        val gemInput = EditText(this).apply {
+            hint = "제미나이 API 키"; setText(prefs.geminiKey); isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        }.also { col.addView(it) }
+        button("제미나이 키 저장 후 시험") {
+            prefs.geminiKey = gemInput.text.toString()
+            Thread {
+                val r = Gemini.askJson(this, "JSON만 출력: {\"ok\": \"안녕하세요\"}")
+                runOnUiThread { toast(if (r != null) "제미나이 연결 성공" else (Gemini.lastError ?: "연결 실패")) }
+            }.start()
+        }
+        switch("일정 메모 본문도 제미나이에 보내기", { prefs.geminiUseNotes }) { prefs.geminiUseNotes = it }
+        note("끄면 일정 제목·장소·참석자 회사 도메인만 보냅니다. 무료 키는 입력이 구글 학습에 쓰일 수 있어 기본은 꺼짐.")
+
+        title("8. 주행")
         button("지금 주행 화면 열기 (테스트)") { startActivity(Intent(this, DriveActivity::class.java)) }
         button("주차 위치 보기") { showParking() }
         button("이번 달 운행기록 내보내기") { exportTrips(0) }
         button("지난 달 운행기록 내보내기") { exportTrips(-1) }
 
-        title("8. 앱 정보")
+        title("9. 앱 정보")
         note("버전 ${BuildConfig.VERSION_NAME}")
         button("업데이트 확인") { Updater.check(this, silent = false) }
 

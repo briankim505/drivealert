@@ -15,7 +15,10 @@ import java.util.Locale
 
 data class CalInfo(val id: Long, val account: String, val name: String)
 
-data class CalEvent(val id: Long, val title: String, val location: String, val begin: Long, val calendar: String)
+data class CalEvent(
+    val id: Long, val title: String, val location: String, val begin: Long, val calendar: String,
+    val description: String = "", val domains: List<String> = emptyList()
+)
 
 /** 휴대폰에 동기화된 구글 캘린더(개인·회사 모두)에서 다가오는 일정과 장소를 찾는다 */
 object Schedule {
@@ -41,17 +44,23 @@ object Schedule {
 
     /** 지금부터 hours 시간 안의 일정 (종일 일정 제외, 시간순) */
     fun upcoming(ctx: Context, hours: Int): List<CalEvent> {
-        if (!hasPermission(ctx)) return emptyList()
         val now = System.currentTimeMillis()
+        return between(ctx, now - 10 * 60_000, now + hours * 3_600_000L)
+    }
+
+    /** from~to 사이에 시작하는 일정 */
+    fun between(ctx: Context, from: Long, to: Long): List<CalEvent> {
+        if (!hasPermission(ctx)) return emptyList()
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon().also {
-            ContentUris.appendId(it, now - 10 * 60_000)
-            ContentUris.appendId(it, now + hours * 3_600_000L)
+            ContentUris.appendId(it, from)
+            ContentUris.appendId(it, to)
         }.build()
         val cols = arrayOf(
             CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.TITLE,
             CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.BEGIN,
             CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
-            CalendarContract.Instances.SELF_ATTENDEE_STATUS, CalendarContract.Instances.CALENDAR_ID
+            CalendarContract.Instances.SELF_ATTENDEE_STATUS, CalendarContract.Instances.CALENDAR_ID,
+            CalendarContract.Instances.DESCRIPTION
         )
         val allowed = Prefs(ctx).calendarIds
         val out = mutableListOf<CalEvent>()
@@ -61,14 +70,32 @@ object Schedule {
                     if (allowed.isNotEmpty() && c.getLong(7).toString() !in allowed) continue // 선택 안 한 캘린더
                     if (c.getInt(4) == 1) continue // 종일 일정
                     if (c.getInt(6) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
-                    if (c.getLong(3) < now - 10 * 60_000) continue
-                    out += CalEvent(c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "", c.getLong(3), c.getString(5) ?: "")
+                    if (c.getLong(3) < from) continue
+                    out += CalEvent(
+                        c.getLong(0), c.getString(1) ?: "", c.getString(2) ?: "", c.getLong(3), c.getString(5) ?: "",
+                        c.getString(8) ?: "", domains(ctx, c.getLong(0))
+                    )
                 }
             }
         } catch (_: Exception) {
         }
         return out
     }
+
+    private val freeMail = setOf("gmail.com", "naver.com", "daum.net", "hanmail.net", "kakao.com", "nate.com",
+        "icloud.com", "outlook.com", "hotmail.com", "xqrd.vc", "group.calendar.google.com", "resource.calendar.google.com")
+
+    /** 참석자 이메일의 회사 도메인 (회사 추정 힌트, 내 회사·개인메일 제외) */
+    private fun domains(ctx: Context, eventId: Long): List<String> = try {
+        val out = mutableSetOf<String>()
+        CalendarContract.Attendees.query(ctx.contentResolver, eventId, arrayOf(CalendarContract.Attendees.ATTENDEE_EMAIL))?.use { c ->
+            while (c.moveToNext()) {
+                val d = (c.getString(0) ?: "").substringAfter('@', "").lowercase()
+                if (d.isNotBlank() && freeMail.none { d.endsWith(it) }) out += d
+            }
+        }
+        out.toList()
+    } catch (_: Exception) { emptyList() }
 
     private val online = Regex("(?i)zoom|meet\\.google|teams|webex|https?://|온라인|화상|전화|콜")
     private val noise = Regex("(?i)미팅|회의|면담|점심|저녁|식사|커피|티타임|ir|미팅\\s*w/?|with|w/|약속|방문|\\(.*?\\)|\\[.*?]")
@@ -87,7 +114,18 @@ object Schedule {
             val loc = e.location.lines().first().trim()
             val r = Places.search(ctx, loc)
             if (r.isNotEmpty()) return r
+            if (Gemini.enabled(ctx)) Gemini.placeQuery(ctx, e)?.let { q ->
+                Places.search(ctx, q).takeIf { it.isNotEmpty() }?.let { return it }
+            }
             return listOf(Place(loc, loc)) // 검색이 안 되면 적힌 그대로
+        }
+        // 제미나이가 있으면: 제목·참석자 회사 도메인으로 '어디로 가야 하는지' 판단
+        if (Gemini.enabled(ctx)) {
+            val gq = Gemini.placeQuery(ctx, e)
+            if (gq != null) {
+                val r = Places.search(ctx, gq)
+                if (r.isNotEmpty()) return r
+            }
         }
         val q = noise.replace(e.title, " ").replace(Regex("\\s+"), " ").trim()
         if (q.length < 2) return emptyList()

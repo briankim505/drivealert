@@ -64,6 +64,7 @@ class DriveActivity : AppCompatActivity(),
         setContentView(R.layout.activity_drive)
         status = findViewById(R.id.status)
         findViewById<android.view.View>(R.id.btn_close).setOnClickListener { DriveControl.stop(this) }
+        findViewById<android.view.View>(R.id.btn_voice).setOnClickListener { listen() }
 
         if (Prefs(this).keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -160,6 +161,37 @@ class DriveActivity : AppCompatActivity(),
         )
         started = true
         status.text = "단속카메라 알림 작동 중"
+    }
+
+    // ---- 음성으로 목적지 바꾸기 ----
+    private val speech = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { r ->
+        val said = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            ?: return@registerForActivityResult
+        status.text = "\"$said\" 찾는 중…"
+        Thread {
+            val place = try { VoiceDest.resolve(this, said) } catch (e: Exception) { null }
+            runOnUiThread {
+                val voice = engine ?: AlertEngine(this).also { engine = it }
+                if (place == null) {
+                    status.text = "'$said' 장소를 찾지 못했습니다"
+                    voice.speak("장소를 찾지 못했어요")
+                } else {
+                    status.text = "테슬라로 보냄: ${place.name}"
+                    voice.speak("${place.name}, 테슬라로 보냈어요")
+                    Tesla.send(this, place)
+                }
+            }
+        }.start()
+    }
+
+    private fun listen() {
+        val i = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "어디로 갈까요? (예: 집, 근처 슈퍼차저)")
+        try { speech.launch(i) } catch (_: Exception) { Toast.makeText(this, "음성 인식을 쓸 수 없습니다", Toast.LENGTH_SHORT).show() }
     }
 
     private fun finishDrive() {

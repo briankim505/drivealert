@@ -14,11 +14,22 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
-        android:layout_margin="12dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="96dp"
         android:background="#99000000"
         android:padding="8dp"
         android:textColor="#FFFFFF"
         android:textSize="13sp" />
+
+    <Button
+        android:id="@+id/btn_voice"
+        android:layout_width="wrap_content"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:paddingHorizontal="28dp"
+        android:text="🎤 목적지 말하기"
+        android:textSize="18sp" />
 
     <Button
         android:id="@+id/btn_close"

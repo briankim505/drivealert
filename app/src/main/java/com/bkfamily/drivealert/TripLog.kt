@@ -44,6 +44,16 @@ object TripLog {
         }
     }
 
+    /** 도착 시각 전후 일정으로 사용목적을 정한다 (제미나이 있으면 운행기록부 문구로 다듬음) */
+    private fun purpose(ctx: Context, start: Long, end: Long): String {
+        val ev = Schedule.between(ctx, end - 60 * 60_000L, end + 90 * 60_000L)
+            .filter { !Schedule.isOnline(it) }
+            .minByOrNull { kotlin.math.abs(it.begin - end) }
+            ?: Schedule.between(ctx, start - 30 * 60_000L, end).lastOrNull { !Schedule.isOnline(it) }
+            ?: return ""
+        return (if (Gemini.enabled(ctx)) Gemini.tripPurpose(ctx, ev.title) else null) ?: ev.title
+    }
+
     /** monthOffset 0 = 이번 달, -1 = 지난 달. 백그라운드 스레드에서 호출할 것 */
     fun exportCsv(ctx: Context, monthOffset: Int): File {
         val cal = Calendar.getInstance().apply { add(Calendar.MONTH, monthOffset) }
@@ -55,6 +65,7 @@ object TripLog {
         sb.append("날짜,출발시각,도착시각,출발지,도착지,주행거리(km),사용목적\n")
         var total = 0.0
         val arr = all(ctx)
+        var changed = false
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val c = Calendar.getInstance().apply { timeInMillis = o.getLong("start") }
@@ -62,13 +73,19 @@ object TripLog {
             val from = address(ctx, o.optDoubleOrNull("fromLat"), o.optDoubleOrNull("fromLon"))
             val to = address(ctx, o.optDoubleOrNull("toLat"), o.optDoubleOrNull("toLon"))
             val km = o.getDouble("km")
+            if (!o.has("purpose")) {
+                val pp = purpose(ctx, o.getLong("start"), o.getLong("end"))
+                if (pp.isNotEmpty()) { o.put("purpose", pp); changed = true }
+            }
+            val why = o.optString("purpose").replace("\"", "'")
             total += km
             sb.append(dFmt.format(o.getLong("start"))).append(',')
                 .append(tFmt.format(o.getLong("start"))).append(',')
                 .append(tFmt.format(o.getLong("end"))).append(',')
                 .append('"').append(from).append("\",\"").append(to).append("\",")
-                .append(km).append(",\n")
+                .append(km).append(",\"").append(why).append("\"\n")
         }
+        if (changed) synchronized(this) { file(ctx).writeText(arr.toString()) }
         sb.append(",,,,합계,").append(Math.round(total * 10) / 10.0).append(",\n")
         val out = File(ctx.cacheDir, "운행기록_%d-%02d.csv".format(y, m + 1))
         out.writeText(sb.toString())

@@ -76,6 +76,20 @@ class Prefs(context: Context) {
         get() = sp.getFloat("ttsPitch", 1.0f)
         set(v) = sp.edit().putFloat("ttsPitch", v).apply()
 
+    // ---- 제미나이 ----
+    var geminiKey: String
+        get() = sp.getString("geminiKey", "") ?: ""
+        set(v) = sp.edit().putString("geminiKey", v.trim()).apply()
+
+    var geminiModel: String
+        get() = sp.getString("geminiModel", "gemini-flash-latest") ?: "gemini-flash-latest"
+        set(v) = sp.edit().putString("geminiModel", v.trim()).apply()
+
+    /** 일정 메모 본문까지 제미나이에 보낼지 (기본: 보내지 않음) */
+    var geminiUseNotes: Boolean
+        get() = sp.getBoolean("geminiUseNotes", false)
+        set(v) = sp.edit().putBoolean("geminiUseNotes", v).apply()
+
     // ---- 음량 ----
     var volumeAuto: Boolean
         get() = sp.getBoolean("volumeAuto", true)
