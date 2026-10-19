@@ -49,6 +49,7 @@ class DriveActivity : AppCompatActivity(),
     private lateinit var naviView: KNNaviView
     private lateinit var status: TextView
     private var started = false
+    private var engine: AlertEngine? = null
 
     private val stopReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) = finishDrive()
@@ -142,6 +143,14 @@ class DriveActivity : AppCompatActivity(),
         guidance.safetyGuideDelegate = this
         guidance.voiceGuideDelegate = this
         guidance.useBackgroundUpdate = true
+        val eng = AlertEngine(this).also { engine = it }
+        // 단속 지점 접근 시 SDK가 호출 → 사용자 설정대로 안내 (반환값: 카카오 경고음 사용 여부)
+        guidance.judgeOverSpeedAlert = { code, limit, cur, remain, highway ->
+            val r = eng.onCamera(code.name, limit, cur, remain, highway)
+            runOnUiThread { status.text = eng.lastInfo }
+            r
+        }
+        guidance.judgeOverSpeedViolation = { _, limit, cur -> limit > 0 && cur > eng.threshold(limit) }
         naviView.guideStateDelegate = this
         // 경로(trip) 없이 시작 = 안전운행 모드
         naviView.initWithGuidance(
@@ -168,6 +177,7 @@ class DriveActivity : AppCompatActivity(),
     override fun onStop() { KNSDK.handleDidEnterBackground(); super.onStop() }
 
     override fun onDestroy() {
+        engine?.release()
         try { unregisterReceiver(stopReceiver) } catch (_: Exception) {}
         super.onDestroy()
     }
@@ -204,8 +214,10 @@ class DriveActivity : AppCompatActivity(),
     override fun guidanceDidUpdateAroundSafeties(aGuidance: KNGuidance, aSafeties: List<KNSafety>?) =
         naviView.guidanceDidUpdateAroundSafeties(aGuidance, aSafeties)
 
+    // 카카오 기본 음성을 쓰지 않는 설정이면 SDK 음성을 막고 앱이 직접 안내
     override fun shouldPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice, aNewData: MutableList<ByteArray>): Boolean =
-        naviView.shouldPlayVoiceGuide(aGuidance, aVoiceGuide, aNewData)
+        if (engine?.useKakaoVoice == false) false
+        else naviView.shouldPlayVoiceGuide(aGuidance, aVoiceGuide, aNewData)
 
     override fun willPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice) =
         naviView.willPlayVoiceGuide(aGuidance, aVoiceGuide)

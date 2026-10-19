@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private lateinit var keyInput: EditText
     private lateinit var carView: TextView
+    private var previewEngine: AlertEngine? = null
 
     private val permLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { nextPermissionStep() }
@@ -130,13 +131,49 @@ class MainActivity : AppCompatActivity() {
         switch("운행기록 자동 작성", { prefs.tripLog }) { prefs.tripLog = it }
         switch("주차 위치 자동 저장", { prefs.parking }) { prefs.parking = it }
 
-        title("5. 주행")
+        title("5. 단속 안내 방식")
+        fun choice(label: String, names: List<String>, values: List<Any>, get: () -> Any, set: (Any) -> Unit) {
+            val b = Button(this).apply { isAllCaps = false }
+            fun upd() { b.text = "$label: " + names[values.indexOf(get()).coerceAtLeast(0)] }
+            upd()
+            b.setOnClickListener {
+                AlertDialog.Builder(this).setTitle(label)
+                    .setSingleChoiceItems(names.toTypedArray(), values.indexOf(get())) { d, i -> set(values[i]); upd(); d.dismiss() }
+                    .show()
+            }
+            col.addView(b)
+        }
+        choice("소리", listOf("카카오내비 기본 음성", "휴대폰 음성(직접 설정)", "효과음만", "화면만(무음)"),
+            listOf(Prefs.MODE_KAKAO, Prefs.MODE_TTS, Prefs.MODE_BEEP, Prefs.MODE_SILENT),
+            { prefs.alertMode }) { prefs.alertMode = it as Int }
+        note("아래 설정은 '휴대폰 음성'·'효과음'일 때 적용됩니다. 경고 기준은 모든 방식에 적용됩니다.")
+        choice("과속 경고 기준", listOf("제한속도 넘으면 바로", "제한속도 +5km", "제한속도 +10km", "제한속도 +10%"),
+            listOf(Prefs.MARGIN_0, Prefs.MARGIN_5, Prefs.MARGIN_10, Prefs.MARGIN_10P),
+            { prefs.overMargin }) { prefs.overMargin = it as Int }
+        choice("첫 안내 거리", listOf("700m", "500m", "300m", "200m"), listOf(700, 500, 300, 200),
+            { prefs.announceDistance }) { prefs.announceDistance = it as Int }
+        choice("과속 중 반복 경고", listOf("한 번만", "10초마다", "5초마다", "3초마다"), listOf(0, 10, 5, 3),
+            { prefs.repeatSec }) { prefs.repeatSec = it as Int }
+        choice("말 빠르기", listOf("느리게", "보통", "빠르게", "아주 빠르게"), listOf(0.8f, 1.0f, 1.3f, 1.6f),
+            { prefs.ttsRate }) { prefs.ttsRate = it as Float }
+        choice("목소리 높낮이", listOf("낮게", "보통", "높게"), listOf(0.8f, 1.0f, 1.25f),
+            { prefs.ttsPitch }) { prefs.ttsPitch = it as Float }
+        switch("경고할 때 현재 속도도 말하기", { prefs.speakSpeed }) { prefs.speakSpeed = it }
+        button("목소리 종류 바꾸기 (휴대폰 음성 설정)") {
+            try { startActivity(Intent("com.android.settings.TTS_SETTINGS")) } catch (_: Exception) { toast("음성 설정을 열 수 없습니다") }
+        }
+        button("미리 듣기") {
+            val e = previewEngine ?: AlertEngine(this).also { previewEngine = it }
+            col.postDelayed({ e.preview() }, 700)
+        }
+
+        title("6. 주행")
         button("지금 주행 화면 열기 (테스트)") { startActivity(Intent(this, DriveActivity::class.java)) }
         button("주차 위치 보기") { showParking() }
         button("이번 달 운행기록 내보내기") { exportTrips(0) }
         button("지난 달 운행기록 내보내기") { exportTrips(-1) }
 
-        title("6. 앱 정보")
+        title("7. 앱 정보")
         note("버전 ${BuildConfig.VERSION_NAME}")
         button("업데이트 확인") { Updater.check(this, silent = false) }
 

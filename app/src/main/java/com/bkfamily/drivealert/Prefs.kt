@@ -46,6 +46,36 @@ class Prefs(context: Context) {
         get() = sp.getLong("parkTime", 0)
         set(v) = sp.edit().putLong("parkTime", v).apply()
 
+    // ---- 경고 설정 ----
+    var alertMode: Int
+        get() = sp.getInt("alertMode", MODE_KAKAO)
+        set(v) = sp.edit().putInt("alertMode", v).apply()
+
+    var overMargin: Int
+        get() = sp.getInt("overMargin", MARGIN_0)
+        set(v) = sp.edit().putInt("overMargin", v).apply()
+
+    var announceDistance: Int
+        get() = sp.getInt("announceDistance", 500)
+        set(v) = sp.edit().putInt("announceDistance", v).apply()
+
+    /** 과속 경고 반복 간격(초). 0 = 한 번만 */
+    var repeatSec: Int
+        get() = sp.getInt("repeatSec", 5)
+        set(v) = sp.edit().putInt("repeatSec", v).apply()
+
+    var speakSpeed: Boolean
+        get() = sp.getBoolean("speakSpeed", true)
+        set(v) = sp.edit().putBoolean("speakSpeed", v).apply()
+
+    var ttsRate: Float
+        get() = sp.getFloat("ttsRate", 1.0f)
+        set(v) = sp.edit().putFloat("ttsRate", v).apply()
+
+    var ttsPitch: Float
+        get() = sp.getFloat("ttsPitch", 1.0f)
+        set(v) = sp.edit().putFloat("ttsPitch", v).apply()
+
     /** 앱 사용자를 구분하는 임의 ID (카카오 SDK userKey) */
     val userKey: String
         get() {
@@ -56,4 +86,15 @@ class Prefs(context: Context) {
             }
             return k
         }
+
+    companion object {
+        const val MODE_KAKAO = 0
+        const val MODE_TTS = 1
+        const val MODE_BEEP = 2
+        const val MODE_SILENT = 3
+        const val MARGIN_0 = 0
+        const val MARGIN_5 = 1
+        const val MARGIN_10 = 2
+        const val MARGIN_10P = 3
+    }
 }
