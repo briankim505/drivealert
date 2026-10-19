@@ -77,8 +77,13 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
      * @return 카카오 기본 경고음을 울릴지 여부
      */
     fun onCamera(codeName: String, limit: Int, cur: Int, remain: Int, highway: Boolean): Boolean {
+        // 과속 단속 카메라만 안내 (어린이보호구역·과속방지턱·신호·버스전용 등은 무시)
+        if (!isSpeedCamera(codeName)) return false
         val over = limit > 0 && cur > threshold(limit)
-        lastInfo = "${label(codeName)} ${remain}m · 제한 ${limit} · 현재 ${cur}km/h"
+        val muted = OtherNav.active(ctx)
+        lastInfo = "${label(codeName)} ${remain}m · 제한 ${limit} · 현재 ${cur}km/h" +
+            if (muted) " · ${OtherNav.activeName(ctx)} 사용 중이라 음성 끔" else ""
+        if (muted) return false
 
         if (useKakaoVoice) return over
 
@@ -155,6 +160,9 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     }
 
     companion object {
+        /** 과속 단속 카메라 종류만 (고정식·구간·이동식·신호과속 겸용 등 'Speed'가 들어간 코드) */
+        fun isSpeedCamera(code: String) = code.contains("Speed") && !code.contains("Hump")
+
         /** 카카오 단속 코드 이름 → 한국어 안내 문구 */
         fun label(code: String): String = when {
             code.contains("SectionIn") -> "구간단속 시작"

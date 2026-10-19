@@ -23,6 +23,8 @@
 
     <queries>
         <package android:name="com.teslamotors.tesla" />
+        <package android:name="com.skt.tmap.ku" />
+        <package android:name="com.nhn.android.nmap" />
     </queries>
 
     <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
@@ -70,6 +72,17 @@
             android:permission="android.permission.BIND_COMPANION_DEVICE_SERVICE">
             <intent-filter>
                 <action android:name="android.companion.CompanionDeviceService" />
+            </intent-filter>
+        </service>
+
+        <!-- 티맵·네이버지도 길안내 감지 -->
+        <service
+            android:name=".OtherNav"
+            android:exported="true"
+            android:label="드라이브 알리미 (다른 내비 감지)"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
 

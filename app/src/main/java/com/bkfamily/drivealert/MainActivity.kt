@@ -144,10 +144,15 @@ class MainActivity : AppCompatActivity() {
             }
             col.addView(b)
         }
-        choice("소리", listOf("카카오내비 기본 음성", "휴대폰 음성(직접 설정)", "효과음만", "화면만(무음)"),
+        choice("소리", listOf("카카오내비 기본 음성 (단속 외 안내 섞임)", "휴대폰 음성 (과속단속만)", "효과음만 (과속단속만)", "화면만(무음)"),
             listOf(Prefs.MODE_KAKAO, Prefs.MODE_TTS, Prefs.MODE_BEEP, Prefs.MODE_SILENT),
             { prefs.alertMode }) { prefs.alertMode = it as Int }
-        note("아래 설정은 '휴대폰 음성'·'효과음'일 때 적용됩니다. 경고 기준은 모든 방식에 적용됩니다.")
+        note("추천: '휴대폰 음성'. 과속 단속 카메라(고정·구간·이동식)만 안내하고 길안내·어린이보호구역·과속방지턱은 말하지 않습니다.")
+        switch("티맵·네이버지도 길안내 중이면 이 앱 음성 끄기", { prefs.muteWithOtherNav }) { prefs.muteWithOtherNav = it }
+        button("↳ 이를 위해 '알림 접근' 허용하기") {
+            try { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) } catch (_: Exception) {}
+            toast("목록에서 '드라이브 알리미'를 켜 주세요")
+        }
         choice("과속 경고 기준", listOf("제한속도 넘으면 바로", "제한속도 +5km", "제한속도 +10km", "제한속도 +10%"),
             listOf(Prefs.MARGIN_0, Prefs.MARGIN_5, Prefs.MARGIN_10, Prefs.MARGIN_10P),
             { prefs.overMargin }) { prefs.overMargin = it as Int }
@@ -232,6 +237,7 @@ class MainActivity : AppCompatActivity() {
         if (!has(Manifest.permission.ACCESS_FINE_LOCATION)) issues += "위치 권한"
         else if (Build.VERSION.SDK_INT >= 29 && !has(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) issues += "위치 '항상 허용'"
         if (!batteryExempt()) issues += "배터리 최적화 제외"
+        if (prefs.muteWithOtherNav && !OtherNav.permitted(this)) issues += "알림 접근(티맵 감지용)"
         statusView.text = if (issues.isEmpty()) "✅ 준비 완료 — 차량에 연결되면 자동으로 작동합니다"
         else "⚠️ 남은 설정: " + issues.joinToString(", ")
     }

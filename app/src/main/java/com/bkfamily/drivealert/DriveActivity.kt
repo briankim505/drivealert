@@ -248,7 +248,7 @@ class DriveActivity : AppCompatActivity(),
 
     // 카카오 기본 음성을 쓰지 않는 설정이면 SDK 음성을 막고 앱이 직접 안내
     override fun shouldPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice, aNewData: MutableList<ByteArray>): Boolean =
-        if (engine?.useKakaoVoice == false) false
+        if (engine?.useKakaoVoice == false || OtherNav.active(this)) false
         else naviView.shouldPlayVoiceGuide(aGuidance, aVoiceGuide, aNewData)
 
     override fun willPlayVoiceGuide(aGuidance: KNGuidance, aVoiceGuide: KNGuide_Voice) =

@@ -48,8 +48,13 @@ class Prefs(context: Context) {
 
     // ---- 경고 설정 ----
     var alertMode: Int
-        get() = sp.getInt("alertMode", MODE_KAKAO)
+        get() = sp.getInt("alertMode", MODE_TTS)
         set(v) = sp.edit().putInt("alertMode", v).apply()
+
+    /** 티맵·네이버지도 길안내 중이면 이 앱 음성 끄기 */
+    var muteWithOtherNav: Boolean
+        get() = sp.getBoolean("muteWithOtherNav", true)
+        set(v) = sp.edit().putBoolean("muteWithOtherNav", v).apply()
 
     var overMargin: Int
         get() = sp.getInt("overMargin", MARGIN_0)
