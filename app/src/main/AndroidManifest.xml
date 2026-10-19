@@ -22,6 +22,14 @@
     <uses-permission android:name="android.permission.REQUEST_OBSERVE_COMPANION_DEVICE_PRESENCE" />
 
     <queries>
+        <!-- 설치된 음성 엔진(삼성 TTS 등) 목록을 보기 위해 필요 -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <package android:name="com.samsung.SMT" />
         <package android:name="com.teslamotors.tesla" />
         <package android:name="com.skt.tmap.ku" />
         <package android:name="com.nhn.android.nmap" />
