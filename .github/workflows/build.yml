@@ -38,17 +38,32 @@ jobs:
       - name: Build
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle :app:assembleRelease --stacktrace 2>&1 | tee build.log; exit ${PIPESTATUS[0]}
+        shell: bash
 
       - name: List Kakao SDK classes (for debugging)
         if: always()
         run: |
           AAR=$(find ~/.gradle/caches -name 'knsdk_ui*.aar' | head -1)
           echo "AAR: $AAR"
-          for a in $(find ~/.gradle/caches -name 'knsdk*.aar'); do
+          (for a in $(find ~/.gradle/caches -name 'knsdk*.aar'); do
             mkdir -p /tmp/k && unzip -o -q "$a" classes.jar -d /tmp/k && \
             unzip -l /tmp/k/classes.jar | awk '{print $4}' | grep -E '/KN(SDK|Guidance|Guide_|Safety|NaviView|Error|LanguageType|Route(Priority|AvoidOption)|MultiRouteInfo|Route)[A-Za-z_]*\.class$' | grep -v '\$' | sort -u
-          done
+            mkdir -p /tmp/kc && cd /tmp/kc && unzip -o -q /tmp/k/classes.jar && cd - >/dev/null
+          done) > classes.txt 2>&1 || true
+          # 주요 인터페이스 메서드 시그니처
+          for c in $(grep -E 'KNGuidance_[A-Za-z]+Delegate|ui/view/KNNaviView|/KNSDK.class' classes.txt); do
+            javap -cp /tmp/kc "${c%.class}" 2>/dev/null
+          done > signatures.txt || true
+
+      - name: Save build report
+        if: always()
+        run: |
+          mkdir -p /tmp/report && cp build.log classes.txt signatures.txt /tmp/report/ 2>/dev/null || true
+          grep -E '^e: |error:|What went wrong|Could not' build.log | head -100 > /tmp/report/errors.txt || true
+          cd /tmp/report && git init -q -b build-report && git add -A && \
+            git -c user.name=ci -c user.email=ci@local commit -q -m "report ${{ github.run_number }}" && \
+            git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" build-report
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
