@@ -118,8 +118,8 @@ class MainActivity : AppCompatActivity() {
 
         title("2. 차량 등록")
         carView = TextView(this).apply { textSize = 14f }.also { col.addView(it) }
-        note("목록에서 차량(예: Tesla Model Y)을 고르면, 이후 블루투스가 연결될 때 자동으로 켜집니다.")
-        button("차량 선택하기") { associateCar() }
+        note("차 안에서 블루투스가 연결된 상태로 누르면 '지금 연결됨' 표시가 붙은 기기가 테슬라입니다. 폰에 등록(페어링)된 기기만 보여줍니다.")
+        button("차량 선택하기") { pickCar() }
 
         title("3. 권한 설정")
         note("위치는 '항상 허용'을 골라야 화면이 꺼져도 작동합니다.")
@@ -247,12 +247,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ------------------------------------------------------------ 차량 등록
+    /** 폰에 페어링된 블루투스 기기 목록에서 차를 고른다 (이름이 제대로 보임) */
     @SuppressLint("MissingPermission")
-    private fun associateCar() {
-        val cdm = getSystemService(CompanionDeviceManager::class.java)
+    private fun pickCar() {
+        if (Build.VERSION.SDK_INT >= 31 && !has(Manifest.permission.BLUETOOTH_CONNECT)) {
+            permLauncher.launch(arrayOf(Manifest.permission.BLUETOOTH_CONNECT))
+            toast("'근처 기기' 권한을 허용한 뒤 다시 눌러 주세요")
+            return
+        }
+        val adapter = getSystemService(android.bluetooth.BluetoothManager::class.java)?.adapter
+        if (adapter == null || !adapter.isEnabled) { toast("블루투스를 켜 주세요"); return }
+        val devices = try { adapter.bondedDevices.toList() } catch (_: SecurityException) { emptyList() }
+        if (devices.isEmpty()) { toast("페어링된 블루투스 기기가 없습니다"); return }
+        fun connected(d: BluetoothDevice) = try {
+            d.javaClass.getMethod("isConnected").invoke(d) as Boolean
+        } catch (_: Exception) { false }
+        fun label(d: BluetoothDevice): String {
+            val alias = if (Build.VERSION.SDK_INT >= 30) try { d.alias } catch (_: Exception) { null } else null
+            return alias ?: safeName(d).ifBlank { d.address }
+        }
+        val teslaLike = Regex("(?i)tesla|model ?[ysx3]|모델")
+        val sorted = devices.sortedWith(compareByDescending<BluetoothDevice> { connected(it) }
+            .thenByDescending { teslaLike.containsMatchIn(label(it)) }.thenBy { label(it) })
+        val items = sorted.map { d ->
+            val tags = listOfNotNull(
+                if (connected(d)) "🔗 지금 연결됨" else null,
+                if (teslaLike.containsMatchIn(label(d))) "🚗" else null,
+                if (d.address.equals(prefs.carAddress, true)) "✅ 등록됨" else null
+            ).joinToString(" ")
+            "${label(d)}  $tags\n${d.address}"
+        }
+        AlertDialog.Builder(this).setTitle("어느 기기가 차인가요?")
+            .setItems(items.toTypedArray()) { _, i ->
+                val d = sorted[i]
+                saveCar(d.address, label(d))
+                associateCar(d.address)
+            }
+            .setNegativeButton("취소", null).show()
+    }
+
+    /** (안드로이드 12+) 고른 차를 '연결 기기'로 등록해 백그라운드 자동 시작을 더 확실하게 */
+    @SuppressLint("MissingPermission")
+    private fun associateCar(address: String) {
+        val cdm = getSystemService(CompanionDeviceManager::class.java) ?: return
+        try {
+            if (cdm.associations.any { it.equals(address, true) }) return
+        } catch (_: Exception) {
+        }
         val request = AssociationRequest.Builder()
-            .addDeviceFilter(BluetoothDeviceFilter.Builder().build())
-            .setSingleDevice(false)
+            .addDeviceFilter(BluetoothDeviceFilter.Builder().setAddress(address).build())
+            .setSingleDevice(true)
             .build()
         if (Build.VERSION.SDK_INT >= 33) {
             val exec = Executor { it.run() }
@@ -261,12 +305,10 @@ class MainActivity : AppCompatActivity() {
                     associateLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
                 }
                 override fun onAssociationCreated(associationInfo: AssociationInfo) {
-                    runOnUiThread {
-                        saveCar(associationInfo.deviceMacAddress?.toString(), associationInfo.displayName?.toString())
-                    }
+                    runOnUiThread { observe(address) }
                 }
                 override fun onFailure(error: CharSequence?) {
-                    runOnUiThread { toast("차량 선택 실패: $error") }
+                    DriveLog.add(this@MainActivity, "연결 기기 등록 실패(블루투스 감지로 대신 작동): $error")
                 }
             })
         } else {
@@ -276,15 +318,24 @@ class MainActivity : AppCompatActivity() {
                 override fun onDeviceFound(chooserLauncher: IntentSender) {
                     associateLauncher.launch(IntentSenderRequest.Builder(chooserLauncher).build())
                 }
-                override fun onFailure(error: CharSequence?) { toast("차량 선택 실패: $error") }
+                override fun onFailure(error: CharSequence?) {
+                    DriveLog.add(this@MainActivity, "연결 기기 등록 실패(블루투스 감지로 대신 작동): $error")
+                }
             }, null)
         }
     }
 
     private fun saveCar(address: String?, name: String?) {
         if (address.isNullOrEmpty()) return
+        val changed = !address.equals(prefs.carAddress, true)
         prefs.carAddress = address
-        prefs.carName = name ?: ""
+        if (!name.isNullOrBlank() && (changed || prefs.carName.isBlank() || name != address)) prefs.carName = name
+        observe(address)
+        if (changed) { toast("차량을 등록했습니다: ${prefs.carName}"); DriveLog.add(this, "차량 등록: ${prefs.carName} ($address)") }
+        refresh()
+    }
+
+    private fun observe(address: String) {
         if (Build.VERSION.SDK_INT >= 31) {
             try {
                 @Suppress("DEPRECATION")
@@ -292,8 +343,6 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {
             }
         }
-        toast("차량을 등록했습니다")
-        refresh()
     }
 
     @SuppressLint("MissingPermission")
