@@ -141,20 +141,24 @@ object Schedule {
      */
     fun autoSend(ctx: Context, withinHours: Int): Boolean {
         val prefs = Prefs(ctx)
-        if (!Tesla.installed(ctx)) return false
+        if (!Tesla.installed(ctx)) { DriveLog.add(ctx, "목적지: 테슬라 앱 없음"); return false }
+        if (!hasPermission(ctx)) { DriveLog.add(ctx, "목적지: 캘린더 권한 없음"); return false }
         val ev = upcoming(ctx, withinHours).firstOrNull { !isOnline(it) && !prefs.wasNotified(it.id, it.begin) }
-            ?: return false
-        val place = guessPlaces(ctx, ev).firstOrNull() ?: return false
+            ?: run { DriveLog.add(ctx, "목적지: ${withinHours}시간 안에 보낼 일정 없음"); return false }
+        val place = guessPlaces(ctx, ev).firstOrNull()
+            ?: run { DriveLog.add(ctx, "목적지: '${ev.title}' 장소를 찾지 못함 ${Places.lastError ?: ""}"); return false }
         val here = Places.lastLocation(ctx)
         if (here != null && place.lat != 0.0) {
             val d = FloatArray(1)
             android.location.Location.distanceBetween(here.first, here.second, place.lat, place.lon, d)
-            if (d[0] < 300f) return false // 이미 목적지 근처
+            if (d[0] < 300f) { DriveLog.add(ctx, "목적지: 이미 '${place.name}' 근처라 안 보냄"); return false }
         }
         prefs.markNotified(ev.id, ev.begin)
         try {
             ctx.startActivity(Tesla.shareIntent(place))
+            DriveLog.add(ctx, "목적지 전송 → 테슬라: ${place.name} (${ev.title})")
         } catch (e: Exception) {
+            DriveLog.add(ctx, "목적지 전송 실패: ${e.javaClass.simpleName} ${e.message}")
             CrashLog.save(ctx, e)
             return false
         }

@@ -110,6 +110,7 @@ class DriveActivity : AppCompatActivity(),
         status.text = "카카오내비 연결 중… (계속 이 문구면 키·키해시 확인 필요)"
         KNSDK.initializeWithAppKey(prefs.kakaoKey, BuildConfig.VERSION_NAME, prefs.userKey) { error: KNError? ->
             runOnUiThread {
+                DriveLog.add(this, if (error == null) "카카오 인증 성공" else "카카오 인증 실패 ${error.code} ${error.msg}")
                 if (error != null) {
                     status.text = "카카오 인증 실패: ${error.code} ${error.msg}"
                     Toast.makeText(this, "카카오 인증 실패 (${error.code})", Toast.LENGTH_LONG).show()
@@ -161,6 +162,7 @@ class DriveActivity : AppCompatActivity(),
         )
         started = true
         status.text = "단속카메라 알림 작동 중"
+        DriveLog.add(this, "단속 안내 시작 (소리: ${listOf("카카오", "휴대폰 음성", "효과음", "무음")[Prefs(this).alertMode]})")
     }
 
     // ---- 음성으로 목적지 바꾸기 ----
@@ -234,14 +236,30 @@ class DriveActivity : AppCompatActivity(),
     override fun guidanceDidUpdateRoutes(aGuidance: KNGuidance, aRoutes: List<KNRoute>, aMultiRouteInfo: KNMultiRouteInfo?) =
         naviView.guidanceDidUpdateRoutes(aGuidance, aRoutes, aMultiRouteInfo)
 
-    override fun guidanceDidUpdateLocation(aGuidance: KNGuidance, aLocationGuide: KNGuide_Location) =
+    override fun guidanceDidUpdateLocation(aGuidance: KNGuidance, aLocationGuide: KNGuide_Location) {
+        try { curSpeed = aLocationGuide.gpsOrigin.speed } catch (_: Exception) {}
         naviView.guidanceDidUpdateLocation(aGuidance, aLocationGuide)
+    }
+    private var curSpeed = 0
 
     override fun guidanceDidUpdateRouteGuide(aGuidance: KNGuidance, aRouteGuide: KNGuide_Route) =
         naviView.guidanceDidUpdateRouteGuide(aGuidance, aRouteGuide)
 
-    override fun guidanceDidUpdateSafetyGuide(aGuidance: KNGuidance, aSafetyGuide: KNGuide_Safety?) =
+    override fun guidanceDidUpdateSafetyGuide(aGuidance: KNGuidance, aSafetyGuide: KNGuide_Safety?) {
+        // 과속 중이 아니어도 단속 카메라가 앞에 나타나면 안내 (보조 경로)
+        try {
+            val cams = aSafetyGuide?.safetiesOnGuide.orEmpty()
+                .filterIsInstance<com.kakaomobility.knsdk.guidance.knguidance.safetyguide.objects.KNSafety_Camera>()
+                .filter { AlertEngine.isSpeedCamera(it.code.name) && !it.passed }
+            cams.firstOrNull()?.let { c ->
+                engine?.onCameraAhead(c.safetyId, c.code.name, c.speedLimit, curSpeed)
+                engine?.let { status.text = it.lastInfo }
+            }
+        } catch (e: Exception) {
+            CrashLog.save(this, e)
+        }
         naviView.guidanceDidUpdateSafetyGuide(aGuidance, aSafetyGuide)
+    }
 
     override fun guidanceDidUpdateAroundSafeties(aGuidance: KNGuidance, aSafeties: List<KNSafety>?) =
         naviView.guidanceDidUpdateAroundSafeties(aGuidance, aSafeties)

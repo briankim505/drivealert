@@ -48,6 +48,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
 
     override fun onInit(status: Int) {
         val t = tts ?: return
+        DriveLog.add(ctx, "음성 엔진 ${if (status == TextToSpeech.SUCCESS) "준비됨" else "실패($status)"}: ${engineFor(ctx) ?: "기본"}")
         if (status == TextToSpeech.SUCCESS) {
             t.language = Locale.KOREAN
             val want = prefs.ttsVoice
@@ -101,6 +102,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
         val firstDist = prefs.announceDistance
         if (!announced && remain <= firstDist) {
             announced = true
+            DriveLog.add(ctx, "안내(거리): ${label(codeName)} ${remain}m 제한 $limit")
             val dist = if (remain >= 100) "${(remain / 100) * 100}미터 앞" else "곧"
             val lim = if (limit > 0) ", 제한속도 $limit" else ""
             say("$dist ${label(codeName)}$lim", beep = 1)
@@ -118,7 +120,38 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
         return false
     }
 
+    private val announcedIds = mutableSetOf<Int>()
+    private var lastSpokeAt = 0L
+
+    /**
+     * 카카오 '안전운행 정보'에 단속 카메라가 새로 잡히면 호출 (과속 여부와 무관하게 1회 안내).
+     * 과속 판단 콜백이 과속일 때만 오는 경우를 대비한 보조 경로.
+     */
+    fun onCameraAhead(id: Int, codeName: String, limit: Int, cur: Int) {
+        val muted = OtherNav.active(ctx)
+        lastInfo = "${label(codeName)} 앞 · 제한 $limit · 현재 ${cur}km/h" +
+            if (muted) " · ${OtherNav.activeName(ctx)} 사용 중이라 음성 끔" else ""
+        if (useKakaoVoice || muted) return
+        val now = SystemClock.elapsedRealtime()
+        if (id !in announcedIds) {
+            announcedIds += id
+            if (now - lastSpokeAt > 8000) {
+                DriveLog.add(ctx, "안내: ${label(codeName)} 제한 $limit (현재 $cur)")
+                say("${label(codeName)}${if (limit > 0) ", 제한속도 $limit" else ""}", beep = 1)
+            }
+        }
+        if (limit > 0 && cur > threshold(limit)) {
+            val interval = prefs.repeatSec * 1000L
+            if (now - lastWarnAt >= maxOf(interval, 3000L) || lastWarnAt == 0L) {
+                lastWarnAt = now
+                DriveLog.add(ctx, "과속 경고: 제한 $limit, 현재 $cur")
+                say(if (prefs.speakSpeed) "감속하세요, 현재 $cur" else "감속하세요", beep = 3)
+            }
+        }
+    }
+
     private fun say(text: String, beep: Int) {
+        lastSpokeAt = SystemClock.elapsedRealtime()
         when (prefs.alertMode) {
             Prefs.MODE_TTS -> speak(text)
             Prefs.MODE_BEEP -> tone(beep)
@@ -129,7 +162,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     fun speak(text: String) {
         initTts()
         val t = tts ?: return
-        if (!ttsReady) return
+        if (!ttsReady) { DriveLog.add(ctx, "음성 엔진 준비 전이라 못 말함: $text"); return }
         t.setSpeechRate(prefs.ttsRate)
         t.setPitch(prefs.ttsPitch)
         am.requestAudioFocus(focus)

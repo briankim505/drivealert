@@ -219,6 +219,7 @@ class MainActivity : AppCompatActivity() {
         note("끄면 일정 제목·장소·참석자 회사 도메인만 보냅니다. 무료 키는 입력이 구글 학습에 쓰일 수 있어 기본은 꺼짐.")
 
         title("8. 주행")
+        button("최근 주행 기록 보기 (문제 확인용)") { showLog() }
         button("지금 주행 화면 열기 (테스트)") { startActivity(Intent(this, DriveActivity::class.java)) }
         button("주차 위치 보기") { showParking() }
         button("이번 달 운행기록 내보내기") { exportTrips(0) }
@@ -384,17 +385,36 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    private fun showLog() {
+        val text = DriveLog.read(this).ifBlank { "아직 기록이 없습니다" }
+        val tv = TextView(this).apply {
+            this.text = text; textSize = 12f; setTextIsSelectable(true)
+            val p = (16 * resources.displayMetrics.density).toInt(); setPadding(p, p / 2, p, 0)
+        }
+        AlertDialog.Builder(this).setTitle("최근 기록 (최신순)")
+            .setView(ScrollView(this).apply { addView(tv) })
+            .setPositiveButton("공유") { _, _ ->
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "기록 보내기"))
+            }
+            .setNeutralButton("지우기") { _, _ -> DriveLog.clear(this) }
+            .setNegativeButton("닫기", null).show()
+    }
+
     private fun chooseEngine() {
         val probe = android.speech.tts.TextToSpeech(this) {}
-        val engines = probe.engines
+        val engines = probe.engines.map { it.name to it.label }.toMutableList()
         probe.shutdown()
+        // 목록에 안 잡혀도 삼성 TTS가 설치돼 있으면 직접 추가
+        val samsung = try { packageManager.getApplicationInfo(AlertEngine.SAMSUNG_TTS, 0) } catch (_: Exception) { null }
+        if (samsung != null && engines.none { it.first == AlertEngine.SAMSUNG_TTS })
+            engines.add(0, AlertEngine.SAMSUNG_TTS to "삼성 TTS")
         if (engines.isEmpty()) { toast("설치된 음성 엔진이 없습니다"); return }
         val cur = AlertEngine.engineFor(this)
         AlertDialog.Builder(this).setTitle("음성 엔진")
-            .setSingleChoiceItems(engines.map { it.label }.toTypedArray(), engines.indexOfFirst { it.name == cur }) { d, i ->
-                prefs.ttsEngine = engines[i].name
+            .setSingleChoiceItems(engines.map { it.second }.toTypedArray(), engines.indexOfFirst { it.first == cur }) { d, i ->
+                prefs.ttsEngine = engines[i].first
                 prefs.ttsVoice = ""
-                toast("${engines[i].label} 선택. '목소리 고르기'로 목소리를 바꿀 수 있어요")
+                toast("${engines[i].second} 선택. '목소리 고르기'로 목소리를 바꿀 수 있어요")
                 d.dismiss()
             }.show()
     }
