@@ -211,6 +211,11 @@ class DriveActivity : AppCompatActivity(),
     override fun onStop() { KNSDK.handleDidEnterBackground(); super.onStop() }
 
     override fun onDestroy() {
+        // 화면이 닫히면 카카오 안내(GPS·데이터)도 반드시 끈다
+        if (started) {
+            try { KNSDK.sharedGuidance()?.stop() } catch (_: Exception) {}
+            started = false
+        }
         engine?.release()
         try { unregisterReceiver(stopReceiver) } catch (_: Exception) {}
         super.onDestroy()
