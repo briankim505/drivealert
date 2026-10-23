@@ -57,6 +57,7 @@ class DriveActivity : AppCompatActivity(),
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        App.knStart(application)
         if (Build.VERSION.SDK_INT >= 27) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
@@ -205,17 +206,15 @@ class DriveActivity : AppCompatActivity(),
     }
 
     // ---- 앱 상태를 SDK에 전달 (화면 꺼짐/켜짐 대응) ----
-    override fun onResume() { super.onResume(); KNSDK.handleDidBecomeActive() }
-    override fun onPause() { KNSDK.handleWillResignActive(); super.onPause() }
-    override fun onStart() { super.onStart(); KNSDK.handleWillEnterForeground() }
-    override fun onStop() { KNSDK.handleDidEnterBackground(); super.onStop() }
+    override fun onResume() { super.onResume(); runCatching { KNSDK.handleDidBecomeActive() } }
+    override fun onPause() { runCatching { KNSDK.handleWillResignActive() }; super.onPause() }
+    override fun onStart() { super.onStart(); runCatching { KNSDK.handleWillEnterForeground() } }
+    override fun onStop() { runCatching { KNSDK.handleDidEnterBackground() }; super.onStop() }
 
     override fun onDestroy() {
         // 화면이 닫히면 카카오 안내(GPS·데이터)도 반드시 끈다
-        if (started) {
-            try { KNSDK.sharedGuidance()?.stop() } catch (_: Exception) {}
-            started = false
-        }
+        started = false
+        App.knStop(this)
         engine?.release()
         try { unregisterReceiver(stopReceiver) } catch (_: Exception) {}
         super.onDestroy()

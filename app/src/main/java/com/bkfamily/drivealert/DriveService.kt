@@ -159,6 +159,7 @@ class DriveService : Service(), LocationListener {
     override fun onDestroy() {
         running = false
         guard.removeCallbacks(guardTick)
+        App.knStop(this)
         Volume.onDriveEnd(this)
         DriveLog.add(this, "주행 종료 (주행거리 ${"%.1f".format(distanceM / 1000)}km)")
         try {
