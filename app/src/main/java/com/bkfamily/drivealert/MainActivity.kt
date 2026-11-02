@@ -488,7 +488,7 @@ class MainActivity : AppCompatActivity() {
         GeminiVoice.fillMissing(this, GeminiVoice.commonPhrases()) { done, total ->
             runOnUiThread {
                 if (total == 0) toast("이미 모두 만들어져 있습니다")
-                else if (done == total) toast("제미나이 음성 준비 완료 ($total개)")
+                else if (done == total) toast("제미나이 음성 준비 완료 (${total}개)")
             }
         }
     }
