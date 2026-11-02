@@ -172,6 +172,14 @@ class MainActivity : AppCompatActivity() {
             { prefs.volumeLevel }) { prefs.volumeLevel = it as Int }
         note("지금 음량이 이보다 낮을 때만 올립니다 (0이어도 올림).")
         switch("주행 끝나면 원래 음량으로 되돌리기", { prefs.volumeRestore }) { prefs.volumeRestore = it }
+        choice("음성 종류", listOf("휴대폰 음성 (삼성·구글)", "제미나이 음성 (더 자연스러움)"),
+            listOf(Prefs.VOICE_PHONE, Prefs.VOICE_GEMINI), { prefs.voiceSource }) {
+            prefs.voiceSource = it as Int
+            if (it == Prefs.VOICE_GEMINI && prefs.geminiKey.isBlank()) toast("7번에서 제미나이 키를 먼저 넣어 주세요")
+        }
+        button("제미나이 목소리 고르기") { chooseGeminiVoice() }
+        button("제미나이 음성 미리 만들기 (와이파이에서 1회, 약 3분)") { prepareGeminiVoice() }
+        note("제미나이 음성은 안내 문장을 미리 만들어 폰에 저장해 두고 씁니다. 그래서 주행 중 인터넷이 없어도 바로 나옵니다. 아직 없는 문장은 휴대폰 음성으로 말하고 다음부터 제미나이 음성으로 바뀝니다.")
         button("음성 엔진 고르기 (삼성 / 구글)") { chooseEngine() }
         button("목소리 고르기") { chooseVoice() }
         button("(엔진 음성 데이터 설치·관리)") {
@@ -449,6 +457,40 @@ class MainActivity : AppCompatActivity() {
             }
             .setNeutralButton("지우기") { _, _ -> DriveLog.clear(this) }
             .setNegativeButton("닫기", null).show()
+    }
+
+    private fun chooseGeminiVoice() {
+        val names = GeminiVoice.voices.keys.toList()
+        AlertDialog.Builder(this).setTitle("제미나이 목소리 (누르면 샘플 생성 후 재생)")
+            .setSingleChoiceItems(names.map { "$it · ${GeminiVoice.voices[it]}" }.toTypedArray(), names.indexOf(prefs.geminiVoice)) { _, i ->
+                prefs.geminiVoice = names[i]
+                toast("샘플 만드는 중…")
+                Thread {
+                    val ok = GeminiVoice.has(this, "과속 단속") || GeminiVoice.synth(this, "과속 단속")
+                    runOnUiThread {
+                        if (!ok) toast(GeminiVoice.lastError ?: "실패")
+                        else try {
+                            android.media.MediaPlayer().apply {
+                                setDataSource(GeminiVoice.fileFor(this@MainActivity, "과속 단속").path)
+                                setOnCompletionListener { it.release() }; prepare(); start()
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }.start()
+            }
+            .setPositiveButton("확인") { _, _ -> toast("목소리를 바꿨다면 '미리 만들기'를 한 번 더 눌러 주세요") }
+            .show()
+    }
+
+    private fun prepareGeminiVoice() {
+        if (prefs.geminiKey.isBlank()) { toast("7번에서 제미나이 키를 먼저 넣어 주세요"); return }
+        toast("만들기 시작 (화면을 꺼도 계속됩니다)")
+        GeminiVoice.fillMissing(this, GeminiVoice.commonPhrases()) { done, total ->
+            runOnUiThread {
+                if (total == 0) toast("이미 모두 만들어져 있습니다")
+                else if (done == total) toast("제미나이 음성 준비 완료 ($total개)")
+            }
+        }
     }
 
     private fun chooseEngine() {

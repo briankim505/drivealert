@@ -128,7 +128,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
             DriveLog.add(ctx, "안내(거리): ${label(codeName)} ${remain}m 제한 $limit")
             val dist = if (remain >= 100) "${(remain / 100) * 100}미터 앞" else "곧"
             val lim = if (limit > 0) ", 제한속도 $limit" else ""
-            say("$dist ${label(codeName)}$lim", beep = 1)
+            say("$dist, ${label(codeName)}$lim", beep = 1)
         }
 
         if (over && remain <= firstDist) {
@@ -183,6 +183,16 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     }
 
     fun speak(text: String) {
+        // 제미나이 음성: 미리 만든 조각이 다 있으면 이어서 재생
+        if (prefs.voiceSource == Prefs.VOICE_GEMINI && Gemini.enabled(ctx)) {
+            val segs = GeminiVoice.segments(text)
+            // '현재 72' 같은 속도 숫자는 조각이 없으면 생략
+            val usable = segs.filter { GeminiVoice.has(ctx, it) || !Regex("^현재 \\d+$").matches(it) }
+            if (usable.isNotEmpty() && usable.all { GeminiVoice.has(ctx, it) }) {
+                playAll(usable.map { GeminiVoice.fileFor(ctx, it) }); return
+            }
+            GeminiVoice.fillMissing(ctx, usable) // 다음부터는 제미나이 음성으로
+        }
         initTts()
         val t = tts ?: return
         if (!ttsReady) { DriveLog.add(ctx, "음성 엔진 준비 전이라 못 말함: $text"); return }
@@ -203,15 +213,24 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
         }
     }
 
+    /** 여러 조각을 차례로 재생 */
+    private fun playAll(files: List<File>) {
+        if (files.isEmpty()) return
+        play(files.first()) { playAll(files.drop(1)) }
+    }
+
     /** 만들어 둔 음성 파일을 이 앱의 미디어 소리로 재생 */
-    private fun play(f: File) {
+    private fun play(f: File, next: (() -> Unit)? = null) {
         try {
             player?.release()
             am.requestAudioFocus(mediaFocus)
             player = MediaPlayer().apply {
                 setAudioAttributes(mediaAttrs)
                 setDataSource(f.path)
-                setOnCompletionListener { it.release(); if (player === it) player = null; am.abandonAudioFocusRequest(mediaFocus) }
+                setOnCompletionListener {
+                    it.release(); if (player === it) player = null
+                    if (next != null) next() else am.abandonAudioFocusRequest(mediaFocus)
+                }
                 setOnErrorListener { mp, _, _ -> mp.release(); if (player === mp) player = null; am.abandonAudioFocusRequest(mediaFocus); true }
                 prepare()
                 start()
@@ -237,7 +256,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     /** 설정 화면 미리 듣기 */
     fun preview() {
         when (prefs.alertMode) {
-            Prefs.MODE_TTS -> speak("300미터 앞 과속 단속, 제한속도 60. 감속하세요, 현재 72")
+            Prefs.MODE_TTS -> speak("300미터 앞, 과속 단속, 제한속도 60, 감속하세요")
             Prefs.MODE_BEEP -> tone(3)
             Prefs.MODE_KAKAO -> speak("카카오내비 기본 음성은 주행 화면에서 나옵니다")
             else -> {}

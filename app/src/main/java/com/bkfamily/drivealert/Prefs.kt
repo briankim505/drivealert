@@ -92,6 +92,15 @@ class Prefs(context: Context) {
         get() = sp.getString("ttsVoice", "") ?: ""
         set(v) = sp.edit().putString("ttsVoice", v).apply()
 
+    /** 음성 종류: 휴대폰 음성 / 제미나이 음성 */
+    var voiceSource: Int
+        get() = sp.getInt("voiceSource", VOICE_PHONE)
+        set(v) = sp.edit().putInt("voiceSource", v).apply()
+
+    var geminiVoice: String
+        get() = sp.getString("geminiVoice", "Kore") ?: "Kore"
+        set(v) = sp.edit().putString("geminiVoice", v).apply()
+
     var ttsPitch: Float
         get() = sp.getFloat("ttsPitch", 1.0f)
         set(v) = sp.edit().putFloat("ttsPitch", v).apply()
@@ -180,6 +189,8 @@ class Prefs(context: Context) {
         }
 
     companion object {
+        const val VOICE_PHONE = 0
+        const val VOICE_GEMINI = 1
         const val MODE_KAKAO = 0
         const val MODE_TTS = 1
         const val MODE_BEEP = 2
