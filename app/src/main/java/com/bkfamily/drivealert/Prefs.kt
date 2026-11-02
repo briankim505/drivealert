@@ -22,6 +22,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("keepScreenOn", false)
         set(v) = sp.edit().putBoolean("keepScreenOn", v).apply()
 
+    /** 차 연결 시 꺼진 화면을 켤지 (기본: 안 켬) */
+    var wakeScreen: Boolean
+        get() = sp.getBoolean("wakeScreen", false)
+        set(v) = sp.edit().putBoolean("wakeScreen", v).apply()
+
     var tripLog: Boolean
         get() = sp.getBoolean("tripLog", true)
         set(v) = sp.edit().putBoolean("tripLog", v).apply()

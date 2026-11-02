@@ -60,8 +60,6 @@
             android:exported="false"
             android:launchMode="singleTask"
             android:screenOrientation="portrait"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
         <activity

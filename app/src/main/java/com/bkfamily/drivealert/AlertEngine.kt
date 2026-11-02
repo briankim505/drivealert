@@ -4,6 +4,10 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
+import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
+import java.io.File
 import android.media.ToneGenerator
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
@@ -27,6 +31,18 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
         .build()
     private val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
         .setAudioAttributes(attrs).build()
+
+    // 음성은 '이 앱의 미디어 소리'로 재생해야 삼성 '분리 앱 사운드' 설정이 적용된다.
+    // (TTS로 바로 말하면 소리가 TTS 엔진 앱에서 나는 것으로 처리돼 분리 설정이 무시됨)
+    private val mediaAttrs = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+    private val mediaFocus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+        .setAudioAttributes(mediaAttrs).build()
+    private val main = Handler(Looper.getMainLooper())
+    private val pending = java.util.concurrent.ConcurrentHashMap<String, File>()
+    private var player: MediaPlayer? = null
 
     // 단속 지점별 안내 상태
     private var currentKey: String? = null
@@ -56,9 +72,16 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
             t.setAudioAttributes(attrs)
             t.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(id: String?) {}
-                override fun onDone(id: String?) { am.abandonAudioFocusRequest(focus) }
+                override fun onDone(id: String?) {
+                    val f = id?.let { pending.remove(it) }
+                    if (f != null) main.post { play(f) } else am.abandonAudioFocusRequest(focus)
+                }
                 @Deprecated("Deprecated in Java")
-                override fun onError(id: String?) { am.abandonAudioFocusRequest(focus) }
+                override fun onError(id: String?) {
+                    val f = id?.let { pending.remove(it) }
+                    if (f != null) { f.delete(); DriveLog.add(ctx, "음성 파일 만들기 실패 → 기본 방식으로 말함") }
+                    am.abandonAudioFocusRequest(focus)
+                }
             })
             ttsReady = true
         }
@@ -165,8 +188,39 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
         if (!ttsReady) { DriveLog.add(ctx, "음성 엔진 준비 전이라 못 말함: $text"); return }
         t.setSpeechRate(prefs.ttsRate)
         t.setPitch(prefs.ttsPitch)
-        am.requestAudioFocus(focus)
-        t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "alert${SystemClock.elapsedRealtime()}")
+        // 같은 문장·목소리면 만들어 둔 파일을 재사용 (지연 없음)
+        val key = "${text}|${engineFor(ctx)}|${prefs.ttsVoice}|${prefs.ttsRate}|${prefs.ttsPitch}".hashCode().toString(16)
+        val dir = File(ctx.cacheDir, "tts").apply { mkdirs() }
+        val f = File(dir, "$key.wav")
+        if (f.exists() && f.length() > 1000) { play(f); return }
+        val id = "f:$key:${SystemClock.elapsedRealtime()}"
+        pending[id] = f
+        val r = t.synthesizeToFile(text, android.os.Bundle(), f, id)
+        if (r != TextToSpeech.SUCCESS) {
+            pending.remove(id)
+            am.requestAudioFocus(focus)
+            t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "alert${SystemClock.elapsedRealtime()}")
+        }
+    }
+
+    /** 만들어 둔 음성 파일을 이 앱의 미디어 소리로 재생 */
+    private fun play(f: File) {
+        try {
+            player?.release()
+            am.requestAudioFocus(mediaFocus)
+            player = MediaPlayer().apply {
+                setAudioAttributes(mediaAttrs)
+                setDataSource(f.path)
+                setOnCompletionListener { it.release(); if (player === it) player = null; am.abandonAudioFocusRequest(mediaFocus) }
+                setOnErrorListener { mp, _, _ -> mp.release(); if (player === mp) player = null; am.abandonAudioFocusRequest(mediaFocus); true }
+                prepare()
+                start()
+            }
+        } catch (e: Exception) {
+            f.delete()
+            am.abandonAudioFocusRequest(mediaFocus)
+            DriveLog.add(ctx, "음성 재생 실패: ${e.javaClass.simpleName}")
+        }
     }
 
     private fun tone(times: Int) {
@@ -191,6 +245,8 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     }
 
     fun release() {
+        try { player?.release() } catch (_: Exception) {}
+        player = null
         tts?.stop(); tts?.shutdown(); tts = null
     }
 

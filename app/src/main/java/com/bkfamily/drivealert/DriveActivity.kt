@@ -59,8 +59,10 @@ class DriveActivity : AppCompatActivity(),
         super.onCreate(savedInstanceState)
         App.knStart(application)
         if (Build.VERSION.SDK_INT >= 27) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
+            // 설정에서 켠 경우에만 잠금화면 위로 띄우고 화면을 켠다
+            val wake = Prefs(this).wakeScreen
+            setShowWhenLocked(wake)
+            setTurnScreenOn(wake)
         }
         setContentView(R.layout.activity_drive)
         status = findViewById(R.id.status)

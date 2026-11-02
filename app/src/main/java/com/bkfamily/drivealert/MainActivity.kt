@@ -127,6 +127,8 @@ class MainActivity : AppCompatActivity() {
 
         title("4. 기능")
         switch("블루투스 연결 시 자동 시작", { prefs.autoStart }) { prefs.autoStart = it }
+        switch("차 연결 시 꺼진 화면 켜기", { prefs.wakeScreen }) { prefs.wakeScreen = it }
+        note("꺼 두면 화면은 꺼진 채로 뒤에서 안내만 합니다.")
         switch("주행 중 화면 켜짐 유지", { prefs.keepScreenOn }) { prefs.keepScreenOn = it }
         note("화면이 꺼졌을 때 안내가 끊기면 켜 두세요(충전 중 권장).")
         switch("운행기록 자동 작성", { prefs.tripLog }) { prefs.tripLog = it }
