@@ -61,6 +61,11 @@ class Prefs(context: Context) {
         get() = sp.getBoolean("muteWithOtherNav", true)
         set(v) = sp.edit().putBoolean("muteWithOtherNav", v).apply()
 
+    /** 안내할 때 다른 앱(유튜브 등) 소리를 잠깐 줄일지 (기본: 안 줄임) */
+    var duckOthers: Boolean
+        get() = sp.getBoolean("duckOthers", false)
+        set(v) = sp.edit().putBoolean("duckOthers", v).apply()
+
     var overMargin: Int
         get() = sp.getInt("overMargin", MARGIN_0)
         set(v) = sp.edit().putInt("overMargin", v).apply()
@@ -199,5 +204,6 @@ class Prefs(context: Context) {
         const val MARGIN_5 = 1
         const val MARGIN_10 = 2
         const val MARGIN_10P = 3
+        const val MARGIN_8 = 4
     }
 }

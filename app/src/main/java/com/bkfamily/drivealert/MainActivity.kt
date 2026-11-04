@@ -155,13 +155,14 @@ class MainActivity : AppCompatActivity() {
             try { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) } catch (_: Exception) {}
             toast("목록에서 '통통이'를 켜 주세요")
         }
-        choice("과속 경고 기준", listOf("제한속도 넘으면 바로", "제한속도 +5km", "제한속도 +10km", "제한속도 +10%"),
-            listOf(Prefs.MARGIN_0, Prefs.MARGIN_5, Prefs.MARGIN_10, Prefs.MARGIN_10P),
+        choice("과속 경고 기준", listOf("제한속도 넘으면 바로", "제한속도 +5km", "제한속도 +8km", "제한속도 +10km", "제한속도 +10%"),
+            listOf(Prefs.MARGIN_0, Prefs.MARGIN_5, Prefs.MARGIN_8, Prefs.MARGIN_10, Prefs.MARGIN_10P),
             { prefs.overMargin }) { prefs.overMargin = it as Int }
         choice("첫 안내 거리", listOf("700m", "500m", "300m", "200m"), listOf(700, 500, 300, 200),
             { prefs.announceDistance }) { prefs.announceDistance = it as Int }
-        choice("과속 중 반복 경고", listOf("한 번만", "10초마다", "5초마다", "3초마다"), listOf(0, 10, 5, 3),
+        choice("과속 중 반복 경고", listOf("한 번만", "10초마다", "8초마다", "7초마다", "6초마다", "5초마다", "3초마다"), listOf(0, 10, 8, 7, 6, 5, 3),
             { prefs.repeatSec }) { prefs.repeatSec = it as Int }
+        switch("안내할 때 다른 앱 소리(유튜브 등) 줄이기", { prefs.duckOthers }) { prefs.duckOthers = it }
         choice("말 빠르기", listOf("느리게", "보통", "빠르게", "아주 빠르게"), listOf(0.8f, 1.0f, 1.3f, 1.6f),
             { prefs.ttsRate }) { prefs.ttsRate = it as Float }
         choice("목소리 높낮이", listOf("낮게", "보통", "높게"), listOf(0.8f, 1.0f, 1.25f),

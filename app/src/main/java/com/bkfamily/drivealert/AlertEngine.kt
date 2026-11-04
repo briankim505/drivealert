@@ -91,6 +91,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     fun threshold(limit: Int): Int = when (prefs.overMargin) {
         Prefs.MARGIN_5 -> limit + 5
         Prefs.MARGIN_10 -> limit + 10
+        Prefs.MARGIN_8 -> limit + 8
         Prefs.MARGIN_10P -> (limit * 1.1).toInt()
         else -> limit
     }
@@ -208,7 +209,7 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
         val r = t.synthesizeToFile(text, android.os.Bundle(), f, id)
         if (r != TextToSpeech.SUCCESS) {
             pending.remove(id)
-            am.requestAudioFocus(focus)
+            if (prefs.duckOthers) am.requestAudioFocus(focus)
             t.speak(text, TextToSpeech.QUEUE_FLUSH, null, "alert${SystemClock.elapsedRealtime()}")
         }
     }
@@ -223,7 +224,8 @@ class AlertEngine(private val ctx: Context) : TextToSpeech.OnInitListener {
     private fun play(f: File, next: (() -> Unit)? = null) {
         try {
             player?.release()
-            am.requestAudioFocus(mediaFocus)
+            // 기본은 오디오 포커스를 요청하지 않음 → 유튜브 등 다른 앱 소리가 줄어들지 않고 그대로 겹쳐 나옴
+            if (prefs.duckOthers) am.requestAudioFocus(mediaFocus)
             player = MediaPlayer().apply {
                 setAudioAttributes(mediaAttrs)
                 setDataSource(f.path)
